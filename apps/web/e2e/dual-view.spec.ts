@@ -149,6 +149,12 @@ test('real conversation adapts to a mobile thread and preserves a draft across r
     for (const width of widths) {
       await expectNoHorizontalOverflow(buyer, width);
       await expect(composer).toHaveValue('这本书还有吗？');
+      if (width <= 720) {
+        await expect.poll(() => buyer.evaluate(() =>
+          document.querySelector('.composer')!.getBoundingClientRect().bottom <=
+          document.querySelector('.bottom-nav')!.getBoundingClientRect().top,
+        )).toBe(true);
+      }
     }
     await expect(conversations).toBeVisible();
     await expect(chatPanel.locator('.mobile-chat-back')).toBeHidden();
@@ -186,7 +192,7 @@ test('listing edit fields keep unsaved changes across desktop and mobile layouts
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto(`/edit/${listing.id}`);
   const title = page.getByLabel('商品标题', { exact: true });
-  const description = page.getByLabel('描述', { exact: true });
+  const description = page.getByRole('textbox', { name: '描述', exact: true });
   const price = page.getByLabel('价格（元）', { exact: true });
   await expect(title).toHaveValue(listing.title);
   await title.fill('尚未保存的教材标题');
