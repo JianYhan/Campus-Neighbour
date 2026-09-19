@@ -22,11 +22,11 @@
 
 ## 实际版本与环境
 
-- Java目标21；本机验证使用Oracle JDK 21.0.12.1。Docker/CI配置使用Eclipse Temurin 21，尚不能把本机结果当作这些环境的验证结果。
+- Java目标21；本机验证使用Oracle JDK 21.0.12.1，远程CI使用Eclipse Temurin 21且已通过构建和测试。应用Docker镜像尚未实际构建。
 - Spring Boot 4.1.1、MyBatis-Plus Boot 4 starter 3.5.17、springdoc 3.0.3；Flyway、Security、Session等跟随Boot依赖管理。
 - PostgreSQL 18.3、Redis 8.6.1，通过Docker及Testcontainers实测。
 - Vite 8.3.0、Tailwind 3.4.19、React 19系列；完整补丁版本以`pnpm-lock.yaml`为准，包管理器10.33.0。
-- 项目目标Node24 LTS；本机实际构建使用Node25.8.1，CI配置Node24，远程结果待检查。
+- 项目目标Node24 LTS；本机实际构建使用Node25.8.1，远程CI使用Node24且已通过构建和测试。
 - Maven Wrapper 3.9.12。构建依赖一次下载中断后，经官方仓库重新下载并校验，打包成功。
 
 选型依据：[Spring Boot系统要求](https://docs.spring.io/spring-boot/system-requirements.html)、[MyBatis-Plus Boot 4安装](https://baomidou.com/en/getting-started/install/)、[Vite文档](https://vite.dev/guide/)。兼容结论主要来自本次实际构建和集成测试，不能只依据版本名称。
@@ -39,7 +39,11 @@
 - 前端：6项测试通过，覆盖20字素簇、组合emoji、空白、模板确认发送、失败重试复用编号、切换语言后保留模板原语言。
 - TypeScript检查及Vite生产构建通过；后端可执行Jar打包通过。
 - Docker Compose配置校验通过，PostgreSQL和Redis容器正常；应用镜像构建、生产HTTPS及备份恢复尚未执行。
-- Playwright测试文件已能被测试运行器发现；真实浏览器检查使用Tabbit执行，下述结果不冒充Playwright runner结果。CI将独立运行Playwright用例。
+- 本地真实浏览器检查使用Tabbit执行；远程CI另行使用Playwright runner执行2项测试，均通过：双账号发布／聊天／预约／支付展示／收货／评价，以及英文深色手机布局。
+
+### 远程CI（已执行）
+
+首版代码提交`b1cf75c`的[GitHub Actions记录](https://github.com/JianYhan/Campus-Neighbour/actions/runs/35429970574)显示frontend、backend、browser三组任务全部成功：14项后端测试、6项前端测试、2项Playwright端到端测试、Vite生产构建、Maven verify及格式检查通过。该结果对应上述代码提交，后续提交应查看各自Checks。
 
 测试命令见[仓库首页](../../README.md)，测试源码分别在`apps/api/src/test`与`apps/web/src`。14项测试并不代表测试计划T01—T25的每一个子场景全部完成。
 

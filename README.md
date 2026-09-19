@@ -77,7 +77,7 @@ pnpm --filter @campus/web exec playwright install chromium
 pnpm test:e2e
 ```
 
-GitHub Actions包含前端、后端和浏览器测试任务。首次远程运行结果以Checks为准，不以工作流文件存在代表通过。
+GitHub Actions包含前端、后端和浏览器测试任务。首版代码`b1cf75c`的[远程检查全部通过](https://github.com/JianYhan/Campus-Neighbour/actions/runs/35429970574)：14项后端测试、6项前端测试、2项浏览器端到端测试，以及前后端构建和格式检查。后续提交以对应Checks结果为准。
 
 ## 项目结构与技术
 
