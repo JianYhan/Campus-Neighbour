@@ -181,7 +181,9 @@ it('blocks cached conversation content when access is revoked', async () => {
   await act(async () => {
     await queryClient.invalidateQueries({ queryKey: ['/conversations/first'] });
   });
-  expect(screen.queryByRole('textbox', { name: 'Message' })).not.toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.queryByRole('textbox', { name: 'Message' })).not.toBeInTheDocument(),
+  );
   expect(screen.queryByText('Hello first')).not.toBeInTheDocument();
   expect(screen.getByRole('alert')).toBeInTheDocument();
 });
