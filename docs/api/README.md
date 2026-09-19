@@ -1,12 +1,14 @@
 # Campus Neighbour 接口契约
 
+> **2026-09-19 实施更新：** 已有真实接口和Swagger入口`http://localhost:8080/docs`，OpenAPI导出见[openapi.json](openapi.json)。分页、字段错误及会话详情已在[第二轮](../implementation/iteration-2.md)补齐；商品完整表单编辑和schema精度仍有限制。下文为设计契约，不能把所有计划参数当作均已实现。
+
 版本：v0.1 完整初稿｜日期：2026年9月18日｜负责人、审核人：待填写。
 
-状态：供团队评审，尚未实现或验证。具体业务默认值为建议基线；TDD开发方式已由项目发起人明确采用。
+状态：人工设计契约与实际接口并行维护；实际差异见实施记录。具体业务默认值为建议基线；TDD开发方式已由项目发起人明确采用。
 
 ## 1 用途与统一约定
 
-接口是前后端共同遵守的数据约定。本文覆盖当前功能范围，是可供评审的人工可读契约；OpenAPI机器定义将在开工前按本文补齐、校验，尚未生成。数据库字段见[数据库设计](../database.md)，页面行为见[页面设计](../product-design.md)。
+接口是前后端共同遵守的数据约定。本文覆盖当前功能范围，是可供评审的人工可读契约；OpenAPI机器定义已导出，部分Map字段schema仍需完善。数据库字段见[数据库设计](../database.md)，页面行为见[页面设计](../product-design.md)。
 
 - 基础路径`/api/v1`，UTF-8 JSON；ID均UUID字符串。请求字段camelCase，数据库字段snake_case。
 - 时间ISO 8601带时区，响应统一UTC，例如`2026-09-30T08:00:00Z`；显示时转换Asia/Shanghai。
@@ -65,6 +67,7 @@ sort仅NEWEST/PRICE_ASC/PRICE_DESC，使用ID打破相同价格或时间的平�
 | --- | --- | --- | --- |
 | POST /conversations | S | `{listingId}` | Conversation；相同买家与商品复用原会话，禁止与自己创建 |
 | GET /conversations | S | cursor、limit | Conversation分页 |
+| GET /conversations/{id} | M | 无 | 单个Conversation；不依赖会话列表加载位置 |
 | GET /conversations/{id}/messages | M | beforeCursor或afterCursor二选一、limit | Message分页；无游标取最近一页；beforeCursor取更早、afterCursor取更晚；items均按消息序号升序，nextCursor沿请求方向继续 |
 | POST /conversations/{id}/messages | M | TextMessage或TemplateMessage | Message，201；重复clientMessageId返回已存结果200 |
 | POST /conversations/{id}/read | M | `{lastReadMessageId}` | `{unreadCount}`；只能推进到此会话已存在消息 |
@@ -165,3 +168,7 @@ Notification=`{id,type,resourceType,resourceId,createdAt,readAt}`。ZoneWrite=`{
 TDD要求：接口实现前先写契约测试，包括合法请求、必填／边界、401/403/404和状态冲突；验证失败来自尚未实现的行为，再写实现。金额、时间、枚举、分页游标和幂等结果必须被断言。前端可用本契约虚构数据开发测试，但Mock通过不代表后端接口已验证。
 
 待补实施材料：OpenAPI文件、真实请求样例、自动契约比对及测试报告。任何接口修改同时调整页面、数据设计和对应验收用例。
+
+## 第二轮字段错误说明
+
+`error.fieldErrors`以字段名映射错误代码，包括REQUIRED、TOO_LONG、TOO_SHORT、INVALID_FORMAT、OUT_OF_RANGE、MUST_BE_FUTURE、INVALID_REFERENCE。客户端翻译字段和原因，顶级code保持兼容。字典／专区PATCH未传字段保留，显式null可清空可选条件。分页cursor与当前用户、查询条件绑定，变更筛选时重新从第一页获取。

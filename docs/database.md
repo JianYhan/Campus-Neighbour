@@ -1,5 +1,7 @@
 # Campus Neighbour 数据库设计
 
+> **2026-09-19 实施更新：** 已加入实际Flyway迁移；部分简介字段采用JSONB、校园字典合表。实际表结构以`apps/api/src/main/resources/db/migration/V1__campus.sql`为准，对照说明见[实施记录](implementation/README.md)。
+
 版本：v0.1 完整初稿｜日期：2026年9月18日｜负责人、审核人：待填写。
 
 状态：供团队评审，尚未实现或验证。下文具体规则为建议基线；涉及需求说明书D01—D13的决定仍待确认。

@@ -1,0 +1,17 @@
+{
+  "name": "campus-neighbour",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "dev": "pnpm --filter @campus/web dev",
+    "build": "pnpm --filter @campus/web build",
+    "test": "pnpm --filter @campus/web test",
+    "test:e2e": "pnpm --filter @campus/web test:e2e",
+    "format": "prettier --write \"apps/web/src/**/*.{ts,tsx,css}\" \"apps/api/src/**/*.java\"",
+    "format:check": "prettier --check \"apps/web/src/**/*.{ts,tsx,css}\" \"apps/api/src/**/*.java\""
+  },
+  "devDependencies": {
+    "prettier": "^3.9.8",
+    "prettier-plugin-java": "^2.10.4"
+  }
+}
