@@ -1,4 +1,4 @@
-import { useEffect, useState, FormEvent, ReactNode } from 'react';
+import { useEffect, useState, useRef, FormEvent, ReactNode } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
 import {
   ArrowRight,
@@ -14,6 +14,8 @@ import {
   refreshCsrf,
   queryClient,
   useApi,
+  usePagedApi,
+  LoadMore,
   useMe,
   usePreferences,
   useWords,
@@ -25,7 +27,8 @@ import {
   money,
   Row,
 } from './lib';
-import { ChatComposer } from './ChatComposer';
+import { ChatPanel } from './ChatPanel';
+import { AdminPanel } from './AdminPanel';
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="field">
@@ -145,7 +148,7 @@ export function Account() {
 export function Editor({ id }: { id?: string }) {
   return (
     <Gate>
-      <EditorForm id={id} />
+      <EditorForm key={id || 'new'} id={id} />
     </Gate>
   );
 }
@@ -172,8 +175,10 @@ function EditorForm({ id }: { id?: string }) {
     wantedDescription: '',
   });
   const [images, setImages] = useState<Row[]>([]);
+  const initialized = useRef(false);
   useEffect(() => {
-    if (existing.data) {
+    if (existing.data && !initialized.current) {
+      initialized.current = true;
       const d = existing.data;
       setForm({
         ...d,
@@ -227,189 +232,192 @@ function EditorForm({ id }: { id?: string }) {
           'Clear photos and honest details make a better match.',
         )}
       </p>
-      <ErrorNotice error={existing.error} />
+      <ErrorNotice error={existing.error || cats.error || halls.error || courses.error} />
+      {id && existing.isPending && <Loading />}
       <form className="panel form-grid" onSubmit={submit}>
-        <Field label={w('商品标题', 'Title')}>
-          <input
-            required
-            maxLength={80}
-            value={form.title}
-            onChange={(e) => set('title', e.target.value)}
-          />
-        </Field>
-        <Field label={w('描述', 'Description')}>
-          <textarea
-            required
-            maxLength={2000}
-            rows={4}
-            value={form.description}
-            onChange={(e) => set('description', e.target.value)}
-          />
-        </Field>
-        <div className="form-row">
-          <Field label={w('价格（元）', 'Price (CNY)')}>
+        <fieldset className="form-fields" disabled={action.busy || (!!id && !existing.data)}>
+          <Field label={w('商品标题', 'Title')}>
             <input
-              type="number"
-              min="0"
-              max="9999999.99"
-              step="0.01"
               required
-              value={form.price}
-              onChange={(e) => set('price', e.target.value)}
+              maxLength={80}
+              value={form.title}
+              onChange={(e) => set('title', e.target.value)}
             />
           </Field>
-          <Field label={w('成色', 'Condition')}>
-            <select
-              value={form.conditionCode}
-              onChange={(e) => set('conditionCode', e.target.value)}
-            >
-              {[
-                ['NEW', w('全新', 'New')],
-                ['LIKE_NEW', w('几乎全新', 'Like new')],
-                ['GOOD', w('状态良好', 'Good')],
-                ['FAIR', w('正常使用', 'Fair')],
-              ].map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-        <div className="form-row">
-          <Field label={w('分类', 'Category')}>
-            <select
+          <Field label={w('描述', 'Description')}>
+            <textarea
               required
-              value={form.categoryId}
-              onChange={(e) => set('categoryId', e.target.value)}
-            >
-              <option value="">{w('请选择', 'Choose…')}</option>
-              {opts(cats.data)}
-            </select>
-          </Field>
-          <Field label={w('楼栋 / 校园地点', 'Hall / campus location')}>
-            <select
-              required
-              value={form.buildingId}
-              onChange={(e) => set('buildingId', e.target.value)}
-            >
-              <option value="">{w('请选择', 'Choose…')}</option>
-              {opts(halls.data)}
-            </select>
-          </Field>
-        </div>
-        <div className="upload-area">
-          <label>
-            <Upload size={24} />
-            <strong>{w('添加商品照片（1–6张）', 'Add photos (1–6)')}</strong>
-            <span>PNG / JPEG · ≤5 MiB</span>
-            <input
-              aria-label={w('上传图片', 'Upload photos')}
-              type="file"
-              accept="image/png,image/jpeg"
-              multiple
-              disabled={action.busy}
-              onChange={(e) => {
-                const files = Array.from(e.target.files || []);
-                void action.run(async () => {
-                  if (files.length + images.length > 6) throw new Error('VALIDATION_ERROR');
-                  for (const file of files) {
-                    const data = new FormData();
-                    data.append('file', file);
-                    const i = await api('/images', 'POST', data);
-                    setImages((old) => [...old, i]);
-                  }
-                });
-              }}
+              maxLength={2000}
+              rows={4}
+              value={form.description}
+              onChange={(e) => set('description', e.target.value)}
             />
-          </label>
-          <div className="thumbs">
-            {images.map((i) => (
-              <button
-                type="button"
-                key={i.id}
-                title={w('移除', 'Remove')}
-                onClick={() => setImages(images.filter((x) => x.id !== i.id))}
+          </Field>
+          <div className="form-row">
+            <Field label={w('价格（元）', 'Price (CNY)')}>
+              <input
+                type="number"
+                min="0"
+                max="9999999.99"
+                step="0.01"
+                required
+                value={form.price}
+                onChange={(e) => set('price', e.target.value)}
+              />
+            </Field>
+            <Field label={w('成色', 'Condition')}>
+              <select
+                value={form.conditionCode}
+                onChange={(e) => set('conditionCode', e.target.value)}
               >
-                <img src={i.url} alt="" />
-                <span>×</span>
-              </button>
-            ))}
+                {[
+                  ['NEW', w('全新', 'New')],
+                  ['LIKE_NEW', w('几乎全新', 'Like new')],
+                  ['GOOD', w('状态良好', 'Good')],
+                  ['FAIR', w('正常使用', 'Fair')],
+                ].map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </div>
-        </div>
-        <h3>{w('校园与教材信息', 'Campus & textbook details')}</h3>
-        <Field label={w('关联课程（选填）', 'Course (optional)')}>
-          <select value={form.courseId} onChange={(e) => set('courseId', e.target.value)}>
-            <option value="">{w('未关联', 'No course')}</option>
-            {opts(courses.data)}
-          </select>
-        </Field>
-        <div className="form-row">
-          <Field label={w('作者', 'Author')}>
-            <input
-              maxLength={100}
-              value={form.bookAuthor}
-              onChange={(e) => set('bookAuthor', e.target.value)}
-            />
+          <div className="form-row">
+            <Field label={w('分类', 'Category')}>
+              <select
+                required
+                value={form.categoryId}
+                onChange={(e) => set('categoryId', e.target.value)}
+              >
+                <option value="">{w('请选择', 'Choose…')}</option>
+                {opts(cats.data)}
+              </select>
+            </Field>
+            <Field label={w('楼栋 / 校园地点', 'Hall / campus location')}>
+              <select
+                required
+                value={form.buildingId}
+                onChange={(e) => set('buildingId', e.target.value)}
+              >
+                <option value="">{w('请选择', 'Choose…')}</option>
+                {opts(halls.data)}
+              </select>
+            </Field>
+          </div>
+          <div className="upload-area">
+            <label>
+              <Upload size={24} />
+              <strong>{w('添加商品照片（1–6张）', 'Add photos (1–6)')}</strong>
+              <span>PNG / JPEG · ≤5 MiB</span>
+              <input
+                aria-label={w('上传图片', 'Upload photos')}
+                type="file"
+                accept="image/png,image/jpeg"
+                multiple
+                disabled={action.busy}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  void action.run(async () => {
+                    if (files.length + images.length > 6) throw new Error('VALIDATION_ERROR');
+                    for (const file of files) {
+                      const data = new FormData();
+                      data.append('file', file);
+                      const i = await api('/images', 'POST', data);
+                      setImages((old) => [...old, i]);
+                    }
+                  });
+                }}
+              />
+            </label>
+            <div className="thumbs">
+              {images.map((i) => (
+                <button
+                  type="button"
+                  key={i.id}
+                  title={w('移除', 'Remove')}
+                  onClick={() => setImages(images.filter((x) => x.id !== i.id))}
+                >
+                  <img src={i.url} alt="" />
+                  <span>×</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <h3>{w('校园与教材信息', 'Campus & textbook details')}</h3>
+          <Field label={w('关联课程（选填）', 'Course (optional)')}>
+            <select value={form.courseId} onChange={(e) => set('courseId', e.target.value)}>
+              <option value="">{w('未关联', 'No course')}</option>
+              {opts(courses.data)}
+            </select>
           </Field>
-          <Field label={w('教材版本', 'Edition')}>
+          <div className="form-row">
+            <Field label={w('作者', 'Author')}>
+              <input
+                maxLength={100}
+                value={form.bookAuthor}
+                onChange={(e) => set('bookAuthor', e.target.value)}
+              />
+            </Field>
+            <Field label={w('教材版本', 'Edition')}>
+              <input
+                maxLength={100}
+                value={form.bookEdition}
+                onChange={(e) => set('bookEdition', e.target.value)}
+              />
+            </Field>
+          </div>
+          <label className="check-row">
             <input
-              maxLength={100}
-              value={form.bookEdition}
-              onChange={(e) => set('bookEdition', e.target.value)}
+              type="checkbox"
+              checked={form.swapEnabled}
+              onChange={(e) => set('swapEnabled', e.target.checked)}
             />
-          </Field>
-        </div>
-        <label className="check-row">
-          <input
-            type="checkbox"
-            checked={form.swapEnabled}
-            onChange={(e) => set('swapEnabled', e.target.checked)}
-          />
-          {w('也愿意以物换物', 'I am open to a swap')}
-        </label>
-        {form.swapEnabled && (
-          <Field label={w('希望换得什么？', 'What would you like in return?')}>
-            <input
-              maxLength={500}
-              value={form.wantedDescription}
-              onChange={(e) => set('wantedDescription', e.target.value)}
-            />
-          </Field>
-        )}
-        <ErrorNotice error={action.error} />
-        <button className="btn" disabled={action.busy || !images.length}>
-          {action.busy ? w('处理中…', 'Working…') : w('保存并查看', 'Save & view listing')}
-          <ArrowUpRight size={18} />
-        </button>
-        {id && ['AVAILABLE', 'WITHDRAWN'].includes(form.status) && (
-          <button
-            type="button"
-            className="btn secondary"
-            disabled={action.busy}
-            onClick={() =>
-              void action.run(async () => {
-                await api(
-                  `/listings/${id}/${form.status === 'AVAILABLE' ? 'withdraw' : 'relist'}`,
-                  'POST',
-                  { expectedVersion: form.contentVersion },
-                );
-                void nav({ to: '/mine' });
-              })
-            }
-          >
-            {form.status === 'AVAILABLE'
-              ? w('下架商品', 'Withdraw listing')
-              : w('重新上架', 'Relist item')}
+            {w('也愿意以物换物', 'I am open to a swap')}
+          </label>
+          {form.swapEnabled && (
+            <Field label={w('希望换得什么？', 'What would you like in return?')}>
+              <input
+                maxLength={500}
+                value={form.wantedDescription}
+                onChange={(e) => set('wantedDescription', e.target.value)}
+              />
+            </Field>
+          )}
+          <ErrorNotice error={action.error} />
+          <button className="btn" disabled={action.busy || !images.length}>
+            {action.busy ? w('处理中…', 'Working…') : w('保存并查看', 'Save & view listing')}
+            <ArrowUpRight size={18} />
           </button>
-        )}
+          {id && ['AVAILABLE', 'WITHDRAWN'].includes(form.status) && (
+            <button
+              type="button"
+              className="btn secondary"
+              disabled={action.busy}
+              onClick={() =>
+                void action.run(async () => {
+                  await api(
+                    `/listings/${id}/${form.status === 'AVAILABLE' ? 'withdraw' : 'relist'}`,
+                    'POST',
+                    { expectedVersion: form.contentVersion },
+                  );
+                  void nav({ to: '/mine' });
+                })
+              }
+            >
+              {form.status === 'AVAILABLE'
+                ? w('下架商品', 'Withdraw listing')
+                : w('重新上架', 'Relist item')}
+            </button>
+          )}
+        </fieldset>
       </form>
     </section>
   );
 }
 export function Profile({ id }: { id?: string }) {
   return id ? (
-    <ProfileForm id={id} />
+    <ProfileForm key={id} id={id} />
   ) : (
     <Gate>
       <ProfileForm />
@@ -421,7 +429,7 @@ function ProfileForm({ id }: { id?: string }) {
   const me = useMe();
   const q = useApi('/users/' + id + '/profile', !!id);
   const courses = useApi('/dictionaries/courses');
-  const reviews = useApi('/users/' + (id || me.data?.id) + '/reviews', !!(id || me.data?.id));
+  const reviews = usePagedApi('/users/' + (id || me.data?.id) + '/reviews', !!(id || me.data?.id));
   const action = useAction();
   const [form, setForm] = useState<Row>({
     nickname: '',
@@ -431,10 +439,15 @@ function ProfileForm({ id }: { id?: string }) {
     bio: '',
     courses: [],
   });
+  const initialized = useRef(false);
+  const [saved, setSaved] = useState(false);
   const own = !id || id === me.data?.id;
   useEffect(() => {
     const p = id ? q.data : me.data?.profile;
-    if (p) setForm({ ...p, courses: p.courses || [] });
+    if (p && !initialized.current) {
+      initialized.current = true;
+      setForm({ ...p, courses: p.courses || [] });
+    }
   }, [q.data, me.data?.profile, id]);
   const fields = [
     ['nickname', w('昵称', 'Nickname'), 40],
@@ -455,114 +468,134 @@ function ProfileForm({ id }: { id?: string }) {
       <ErrorNotice error={q.error} />
       <form
         className="panel form-grid"
+        onChangeCapture={() => setSaved(false)}
         onSubmit={(e) => {
           e.preventDefault();
           void action.run(async () => {
             const body: Row = { courses: form.courses };
             fields.forEach(([k]) => (body[k] = form[k] || null));
-            await api('/me/profile', 'PATCH', body);
+            setSaved(false);
+            const updated = await api('/me/profile', 'PATCH', body);
+            setForm({ ...updated, courses: updated.courses || [] });
+            setSaved(true);
           });
         }}
       >
-        {fields.map(([key, label, max]) => (
-          <Field key={key} label={label}>
-            <input
-              readOnly={!own}
-              required={key === 'nickname'}
-              maxLength={max}
-              value={form[key] || ''}
-              onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-            />
-          </Field>
-        ))}
-        <h3>{w('课程背景', 'Course background')}</h3>
-        {form.courses.map((c: Row, n: number) => (
-          <div className="course-row" key={n}>
-            <select
-              disabled={!own}
-              value={c.courseId}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  courses: form.courses.map((x: Row, i: number) =>
-                    i === n ? { ...x, courseId: e.target.value } : x,
-                  ),
-                })
-              }
-            >
-              {courses.data?.items?.map((x: Row) => (
-                <option key={x.id} value={x.id}>
-                  {x.nameZh} / {x.nameEn}
-                </option>
-              ))}
-            </select>
-            <input
-              readOnly={!own}
-              placeholder={w('任课老师', 'Teacher')}
-              value={c.teacher || ''}
-              maxLength={100}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  courses: form.courses.map((x: Row, i: number) =>
-                    i === n ? { ...x, teacher: e.target.value } : x,
-                  ),
-                })
-              }
-            />
-            <input
-              readOnly={!own}
-              placeholder={w('课程简述', 'Course description')}
-              value={c.description || ''}
-              maxLength={500}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  courses: form.courses.map((x: Row, i: number) =>
-                    i === n ? { ...x, description: e.target.value } : x,
-                  ),
-                })
-              }
-            />
-            {own && (
-              <button
-                type="button"
-                className="text-btn"
-                onClick={() =>
-                  setForm({ ...form, courses: form.courses.filter((_: Row, i: number) => i !== n) })
-                }
-              >
-                ×
-              </button>
-            )}
-          </div>
-        ))}
-        {own && (
-          <>
-            <button
-              type="button"
-              className="chip"
-              onClick={() => {
-                if (courses.data?.items?.length)
+        <fieldset className="form-fields" disabled={action.busy}>
+          {fields.map(([key, label, max]) => (
+            <Field key={key} label={label}>
+              <input
+                readOnly={!own}
+                required={key === 'nickname'}
+                maxLength={max}
+                value={form[key] || ''}
+                onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+              />
+            </Field>
+          ))}
+          <h3>{w('课程背景', 'Course background')}</h3>
+          {form.courses.map((c: Row, n: number) => (
+            <div className="course-row" key={n}>
+              <select
+                aria-label={w('课程', 'Course')}
+                disabled={!own}
+                value={c.courseId}
+                onChange={(e) =>
                   setForm({
                     ...form,
-                    courses: [
-                      ...form.courses,
-                      { courseId: courses.data.items[0].id, teacher: '', description: '' },
-                    ],
-                  });
-              }}
-            >
-              {w('添加课程', 'Add course')}
-            </button>
-            <ErrorNotice error={action.error} />
-            <button className="btn" disabled={action.busy}>
-              {w('保存资料', 'Save profile')}
-            </button>
-          </>
-        )}
+                    courses: form.courses.map((x: Row, i: number) =>
+                      i === n ? { ...x, courseId: e.target.value } : x,
+                    ),
+                  })
+                }
+              >
+                {courses.data?.items?.map((x: Row) => (
+                  <option key={x.id} value={x.id}>
+                    {x.nameZh} / {x.nameEn}
+                  </option>
+                ))}
+              </select>
+              <input
+                readOnly={!own}
+                aria-label={w('任课老师', 'Teacher')}
+                placeholder={w('任课老师', 'Teacher')}
+                value={c.teacher || ''}
+                maxLength={100}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    courses: form.courses.map((x: Row, i: number) =>
+                      i === n ? { ...x, teacher: e.target.value } : x,
+                    ),
+                  })
+                }
+              />
+              <input
+                readOnly={!own}
+                aria-label={w('课程简述', 'Course description')}
+                placeholder={w('课程简述', 'Course description')}
+                value={c.description || ''}
+                maxLength={500}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    courses: form.courses.map((x: Row, i: number) =>
+                      i === n ? { ...x, description: e.target.value } : x,
+                    ),
+                  })
+                }
+              />
+              {own && (
+                <button
+                  type="button"
+                  className="text-btn"
+                  aria-label={w('移除此课程', 'Remove course')}
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      courses: form.courses.filter((_: Row, i: number) => i !== n),
+                    })
+                  }
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          ))}
+          {own && (
+            <>
+              <button
+                type="button"
+                className="chip"
+                onClick={() => {
+                  if (courses.data?.items?.length)
+                    setForm({
+                      ...form,
+                      courses: [
+                        ...form.courses,
+                        { courseId: courses.data.items[0].id, teacher: '', description: '' },
+                      ],
+                    });
+                }}
+              >
+                {w('添加课程', 'Add course')}
+              </button>
+              <ErrorNotice error={action.error} />
+              {saved && (
+                <div role="status" className="notice">
+                  {w('资料已保存。', 'Profile saved.')}
+                </div>
+              )}
+              <button className="btn" disabled={action.busy}>
+                {w('保存资料', 'Save profile')}
+              </button>
+            </>
+          )}
+        </fieldset>
       </form>
       <h2 className="mt-8">{w('交易评价', 'Trade reviews')}</h2>
+      <ErrorNotice error={reviews.error} />
+      {reviews.isPending && <Loading />}
       {reviews.data?.items?.map((r: Row) => (
         <div className="panel" key={r.id}>
           <strong>
@@ -571,184 +604,69 @@ function ProfileForm({ id }: { id?: string }) {
           <p>{r.comment}</p>
         </div>
       ))}
-      {!reviews.data?.items?.length && <Empty text={w('还没有评价', 'No reviews yet')} />}
+      {!reviews.isPending && !reviews.error && !reviews.data?.items?.length && (
+        <Empty text={w('还没有评价', 'No reviews yet')} />
+      )}
+      <LoadMore query={reviews} />
     </section>
   );
 }
 export function Messages({ id }: { id?: string }) {
   return (
     <Gate>
-      <MessageBoard id={id} />
+      <ChatPanel id={id} />
     </Gate>
-  );
-}
-function MessageBoard({ id }: { id?: string }) {
-  const w = useWords();
-  const locale = usePreferences((s) => s.locale);
-  const me = useMe();
-  const list = useApi('/conversations');
-  const history = useApi(`/conversations/${id}/messages?limit=100`, !!id);
-  const conv = list.data?.items?.find((c: Row) => c.id === id);
-  const action = useAction();
-  const nav = useNavigate();
-  const [location, setLocation] = useState('');
-  const [when, setWhen] = useState('');
-  const [older, setOlder] = useState<Row[]>([]);
-  const [before, setBefore] = useState<string | null>(null);
-  useEffect(() => {
-    setOlder([]);
-    setBefore(null);
-  }, [id]);
-  useEffect(() => {
-    const items = history.data?.items;
-    if (id && items?.length)
-      void api(`/conversations/${id}/read`, 'POST', {
-        lastReadMessageId: items[items.length - 1].id,
-      });
-  }, [id, history.data]);
-  return (
-    <section className="page">
-      <h1>{w('消息', 'Your conversations')}</h1>
-      <div className="chat-layout">
-        <aside className="panel conversation-list">
-          {list.data?.items?.map((c: Row) => (
-            <Link
-              key={c.id}
-              to={`/messages/${c.id}`}
-              className={c.id === id ? 'conversation selected' : 'conversation'}
-            >
-              <span className="avatar">{c.otherUser.nickname?.slice(0, 1)}</span>
-              <div>
-                <strong>{c.otherUser.nickname}</strong>
-                <p>{c.listingSummary.title}</p>
-              </div>
-              {Number(c.unreadCount) > 0 && <span className="badge">{c.unreadCount}</span>}
-            </Link>
-          ))}
-          {!list.data?.items?.length && <Empty />}
-        </aside>
-        <div className="panel chat-panel">
-          {id && conv ? (
-            <>
-              <div className="chat-title">
-                <strong>{conv.otherUser.nickname}</strong>
-                <Link to={`/listings/${conv.listingId}`}>
-                  {conv.listingSummary.title} · {money(conv.listingSummary.priceMinor)}
-                </Link>
-              </div>
-              <ErrorNotice error={history.error} />
-              <div className="message-history">
-                {(before === null ? history.data?.nextCursor : before) && (
-                  <button
-                    className="chip"
-                    disabled={action.busy}
-                    onClick={() =>
-                      void action.run(async () => {
-                        const result = await api(
-                          `/conversations/${id}/messages?beforeCursor=${before || history.data?.nextCursor}&limit=100`,
-                        );
-                        setOlder((prev) => [...result.items, ...prev]);
-                        setBefore(result.nextCursor || '');
-                      })
-                    }
-                  >
-                    {w('更早的消息', 'Earlier messages')}
-                  </button>
-                )}
-                {[...older, ...(history.data?.items || [])].map((m: Row) => (
-                  <div
-                    className={m.senderId === me.data?.id ? 'message mine' : 'message'}
-                    key={m.id}
-                  >
-                    <p>{m.body}</p>
-                    <small>
-                      {new Date(m.createdAt).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}{' '}
-                      {m.senderId === me.data?.id ? '✓' : ''}
-                    </small>
-                  </div>
-                ))}
-              </div>
-              <ChatComposer
-                locale={locale}
-                send={async (b) => {
-                  await api(`/conversations/${id}/messages`, 'POST', b);
-                  await queryClient.invalidateQueries({
-                    queryKey: [`/conversations/${id}/messages?limit=100`],
-                  });
-                }}
-              />
-              {conv.sellerId === me.data?.id && (
-                <form
-                  className="reservation"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void action.run(async () => {
-                      const l = await api('/listings/' + conv.listingId);
-                      const t = await api('/trades', 'POST', {
-                        conversationId: id,
-                        meetingLocation: location,
-                        meetingAt: new Date(when).toISOString(),
-                        expectedListingVersion: l.contentVersion,
-                      });
-                      void nav({ to: '/trades/' + t.id });
-                    });
-                  }}
-                >
-                  <h3>{w('为这位买家预约', 'Reserve for this buyer')}</h3>
-                  <div className="form-row">
-                    <input
-                      aria-label={w('面交地点', 'Meeting location')}
-                      placeholder={w('面交地点', 'Meeting location')}
-                      required
-                      maxLength={200}
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                    />
-                    <input
-                      aria-label={w('面交时间', 'Meeting time')}
-                      type="datetime-local"
-                      required
-                      value={when}
-                      onChange={(e) => setWhen(e.target.value)}
-                    />
-                    <button className="btn" disabled={action.busy}>
-                      {w('预约', 'Reserve')}
-                    </button>
-                  </div>
-                  <ErrorNotice error={action.error} />
-                </form>
-              )}
-            </>
-          ) : (
-            <Empty text={w('选择一个会话开始聊天', 'Choose a conversation')} />
-          )}
-        </div>
-      </div>
-    </section>
   );
 }
 export function Trades({ id }: { id?: string }) {
   return (
     <Gate>
-      <TradeBoard id={id} />
+      <TradeBoard key={id || 'list'} id={id} />
     </Gate>
   );
 }
 function TradeBoard({ id }: { id?: string }) {
   const w = useWords();
-  const q = useApi(id ? '/trades/' + id : '/trades');
+  const [role, setRole] = useState('');
+  const [status, setStatus] = useState('');
+  const list = usePagedApi(
+    '/trades?' + new URLSearchParams({ ...(role ? { role } : {}), ...(status ? { status } : {}) }),
+    !id,
+  );
+  const detail = useApi('/trades/' + id, !!id);
+  const q = id ? detail : list;
   const me = useMe();
   const action = useAction();
   const [rating, setRating] = useState('5');
   const [comment, setComment] = useState('');
   const [reason, setReason] = useState('');
-  if (q.isPending) return <Loading />;
   return (
     <section className="page narrow">
       <h1>{w('我的交易', 'Your trades')}</h1>
+      {!id && (
+        <div className="list-filters">
+          <Field label={w('交易类型', 'Trade type')}>
+            <select value={role} onChange={(e) => setRole(e.target.value)}>
+              <option value="">{w('全部交易', 'All trades')}</option>
+              <option value="buyer">{w('我买入的', 'Purchases')}</option>
+              <option value="seller">{w('我卖出的', 'Sales')}</option>
+              <option value="swap">{w('以物换物', 'Swaps')}</option>
+            </select>
+          </Field>
+          <Field label={w('交易状态', 'Trade status')}>
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">{w('全部状态', 'All statuses')}</option>
+              <option value="WAITING_MEETUP">{w('待面交', 'Awaiting meetup')}</option>
+              <option value="PARTIALLY_CONFIRMED">
+                {w('等待另一方确认', 'Partially confirmed')}
+              </option>
+              <option value="COMPLETED">{w('已完成', 'Completed')}</option>
+              <option value="CANCELLED">{w('已取消', 'Cancelled')}</option>
+            </select>
+          </Field>
+        </div>
+      )}
+      {q.isPending && <Loading />}
       <ErrorNotice error={q.error} />
       <ErrorNotice error={action.error} />
       {!id ? (
@@ -765,12 +683,15 @@ function TradeBoard({ id }: { id?: string }) {
               <ArrowUpRight />
             </Link>
           ))}
-          {!q.data?.items?.length && <Empty />}
+          {!q.isPending && !q.error && !q.data?.items?.length && (
+            <Empty text={w('当前筛选下没有交易。', 'No trades match these filters.')} />
+          )}
+          <LoadMore query={list} />
         </div>
       ) : (
-        q.data &&
+        detail.data &&
         (() => {
-          const t = q.data;
+          const t = detail.data!;
           const confirmed = t.confirmations?.some((c: Row) => c.userId === me.data?.id);
           const receiver = t.items?.some((i: Row) => i.receiverId === me.data?.id);
           return (
@@ -798,7 +719,9 @@ function TradeBoard({ id }: { id?: string }) {
                 <li>
                   {t.status === 'COMPLETED'
                     ? w('交易已完成', 'Trade completed')
-                    : w('等待收货确认', 'Awaiting receipt confirmation')}
+                    : t.status === 'CANCELLED'
+                      ? w('预约已取消', 'Reservation cancelled')
+                      : w('等待收货确认', 'Awaiting receipt confirmation')}
                 </li>
               </ol>
               {['WAITING_MEETUP', 'PARTIALLY_CONFIRMED'].includes(t.status) &&
@@ -823,6 +746,11 @@ function TradeBoard({ id }: { id?: string }) {
                     {w('确认收货', 'Confirm receipt')}
                   </button>
                 )}
+              {t.status === 'CANCELLED' && (
+                <p className="notice">
+                  {w('取消原因', 'Cancellation reason')}: {t.cancelReason}
+                </p>
+              )}
               {confirmed && t.status !== 'COMPLETED' && (
                 <div className="notice">
                   {w(
@@ -914,13 +842,31 @@ export function Swaps() {
 function SwapBoard() {
   const w = useWords();
   const me = useMe();
-  const mine = useApi('/me/listings?status=AVAILABLE');
-  const others = useApi('/listings?swapEnabled=true&limit=100');
-  const requests = useApi('/swap-requests');
+  const mine = usePagedApi('/me/listings?status=AVAILABLE&swapEnabled=true');
+  const others = usePagedApi('/listings?swapEnabled=true');
+  const [direction, setDirection] = useState('');
+  const [requestStatus, setRequestStatus] = useState('');
+  const requests = usePagedApi(
+    '/swap-requests?' +
+      new URLSearchParams({
+        ...(direction ? { direction } : {}),
+        ...(requestStatus ? { status: requestStatus } : {}),
+      }),
+  );
   const [offered, setOffered] = useState('');
   const [requested, setRequested] = useState(
     new URLSearchParams(location.search).get('listingId') || '',
   );
+  const target = useApi('/listings/' + requested, !!requested);
+  const choices = [
+    ...new Map(
+      [...(others.data?.items || []), ...(target.data ? [target.data] : [])].map((i: Row) => [
+        i.id,
+        i,
+      ]),
+    ).values(),
+  ];
+  const [proposed, setProposed] = useState(false);
   const [place, setPlace] = useState('');
   const [date, setDate] = useState('');
   const action = useAction();
@@ -939,6 +885,7 @@ function SwapBoard() {
         onSubmit={(e) => {
           e.preventDefault();
           void action.run(async () => {
+            setProposed(false);
             const a = await api('/listings/' + offered),
               b = await api('/listings/' + requested);
             await api('/swap-requests', 'POST', {
@@ -949,6 +896,7 @@ function SwapBoard() {
               meetingLocation: place,
               meetingAt: new Date(date).toISOString(),
             });
+            setProposed(true);
           });
         }}
       >
@@ -968,8 +916,8 @@ function SwapBoard() {
           <Field label={w('我想换得', 'In exchange for')}>
             <select required value={requested} onChange={(e) => setRequested(e.target.value)}>
               <option value="">{w('选择对方商品', 'Choose another item')}</option>
-              {others.data?.items
-                ?.filter((i: Row) => i.ownerId !== me.data?.id)
+              {choices
+                .filter((i: Row) => i.ownerId !== me.data?.id)
                 .map((i: Row) => (
                   <option key={i.id} value={i.id}>
                     {i.title}
@@ -977,6 +925,16 @@ function SwapBoard() {
                 ))}
             </select>
           </Field>
+        </div>
+        <div className="form-row">
+          <div>
+            <ErrorNotice error={mine.error} />
+            <LoadMore query={mine} />
+          </div>
+          <div>
+            <ErrorNotice error={others.error || target.error} />
+            <LoadMore query={others} />
+          </div>
         </div>
         <div className="form-row">
           <Field label={w('面交地点', 'Meeting location')}>
@@ -1001,8 +959,33 @@ function SwapBoard() {
           {w('发起换物请求', 'Propose swap')}
         </button>
         <ErrorNotice error={action.error} />
+        {proposed && (
+          <div className="notice" role="status">
+            {w('换物请求已发出。', 'Swap request sent.')}
+          </div>
+        )}
       </form>
       <h2 className="mt-8">{w('我的换物请求', 'Your swap requests')}</h2>
+      <div className="list-filters">
+        <Field label={w('请求方向', 'Request direction')}>
+          <select value={direction} onChange={(e) => setDirection(e.target.value)}>
+            <option value="">{w('全部请求', 'All requests')}</option>
+            <option value="sent">{w('我发出的', 'Sent')}</option>
+            <option value="received">{w('我收到的', 'Received')}</option>
+          </select>
+        </Field>
+        <Field label={w('请求状态', 'Request status')}>
+          <select value={requestStatus} onChange={(e) => setRequestStatus(e.target.value)}>
+            <option value="">{w('全部状态', 'All statuses')}</option>
+            <option value="PENDING">{w('待接受', 'Pending')}</option>
+            <option value="ACCEPTED">{w('已接受', 'Accepted')}</option>
+            <option value="REJECTED">{w('已拒绝', 'Rejected')}</option>
+            <option value="WITHDRAWN">{w('已撤回', 'Withdrawn')}</option>
+          </select>
+        </Field>
+      </div>
+      <ErrorNotice error={requests.error} />
+      {requests.isPending && <Loading />}
       <div className="stack">
         {requests.data?.items?.map((s: Row) => (
           <div key={s.id} className="panel">
@@ -1050,19 +1033,28 @@ function SwapBoard() {
             </div>
           </div>
         ))}
-        {!requests.data?.items?.length && <Empty />}
+        {!requests.isPending && !requests.error && !requests.data?.items?.length && (
+          <Empty text={w('没有符合条件的换物请求。', 'No swap requests match these filters.')} />
+        )}
+        <LoadMore query={requests} />
       </div>
     </section>
   );
 }
 export function Notifications() {
   const w = useWords();
-  const q = useApi('/notifications');
+  const [unread, setUnread] = useState(false);
+  const q = usePagedApi('/notifications?unreadOnly=' + unread);
   const action = useAction();
   return (
     <Gate>
       <section className="page narrow">
         <h1>{w('通知', 'Notifications')}</h1>
+        <label className="check-row mb-6">
+          <input type="checkbox" checked={unread} onChange={(e) => setUnread(e.target.checked)} />
+          {w('仅未读', 'Unread only')}
+        </label>
+        {q.isPending && <Loading />}
         <ErrorNotice error={q.error || action.error} />
         <div className="stack">
           {q.data?.items?.map((n: Row) => (
@@ -1090,7 +1082,10 @@ export function Notifications() {
               {!n.readAt && <span className="online-dot" />}
             </div>
           ))}
-          {!q.data?.items?.length && <Empty />}
+          {!q.isPending && !q.error && !q.data?.items?.length && (
+            <Empty text={w('暂无通知。', 'No notifications.')} />
+          )}
+          <LoadMore query={q} />
         </div>
       </section>
     </Gate>
@@ -1099,201 +1094,7 @@ export function Notifications() {
 export function Admin() {
   return (
     <Gate>
-      <AdminBoard />
+      <AdminPanel />
     </Gate>
-  );
-}
-function AdminBoard() {
-  const w = useWords();
-  const me = useMe();
-  const [tab, setTab] = useState('listings');
-  const [kind, setKind] = useState('buildings');
-  const path = tab === 'dictionaries' ? `/admin/dictionaries/${kind}` : `/admin/${tab}`;
-  const q = useApi(path, me.data?.role === 'ADMIN');
-  const action = useAction();
-  const [zh, setZh] = useState('');
-  const [en, setEn] = useState('');
-  const [start, setStart] = useState('');
-  const [end, setEnd] = useState('');
-  if (me.data?.role !== 'ADMIN') return <ErrorNotice error="FORBIDDEN" />;
-  return (
-    <section className="page">
-      <h1>{w('校园管理', 'Campus administration')}</h1>
-      <div className="categories mb-6">
-        {[
-          ['listings', w('商品', 'Listings')],
-          ['users', w('账号', 'Accounts')],
-          ['dictionaries', w('校园字典', 'Campus dictionaries')],
-          ['zones', w('季节专区', 'Collections')],
-          ['audit-logs', w('处理记录', 'Audit log')],
-        ].map(([v, l]) => (
-          <button
-            key={v}
-            className={tab === v ? 'chip selected' : 'chip'}
-            onClick={() => setTab(v)}
-          >
-            {l}
-          </button>
-        ))}
-      </div>
-      <ErrorNotice error={q.error || action.error} />
-      {(tab === 'zones' || tab === 'dictionaries') && (
-        <form
-          className="panel form-grid mb-6"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void action.run(async () => {
-              await api(
-                path,
-                'POST',
-                tab === 'zones'
-                  ? {
-                      titleZh: zh,
-                      titleEn: en,
-                      startsAt: new Date(start).toISOString(),
-                      endsAt: new Date(end).toISOString(),
-                      enabled: true,
-                    }
-                  : { nameZh: zh, nameEn: en, active: true },
-              );
-              setZh('');
-              setEn('');
-            });
-          }}
-        >
-          {tab === 'dictionaries' && (
-            <select
-              aria-label={w('字典类型', 'Dictionary type')}
-              value={kind}
-              onChange={(e) => setKind(e.target.value)}
-            >
-              {[
-                ['buildings', w('楼栋', 'Buildings')],
-                ['courses', w('课程', 'Courses')],
-                ['categories', w('分类', 'Categories')],
-              ].map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          )}
-          <div className="form-row">
-            <Field label={w('中文名称', 'Chinese name')}>
-              <input required maxLength={100} value={zh} onChange={(e) => setZh(e.target.value)} />
-            </Field>
-            <Field label={w('英文名称', 'English name')}>
-              <input required maxLength={100} value={en} onChange={(e) => setEn(e.target.value)} />
-            </Field>
-          </div>
-          {tab === 'zones' && (
-            <div className="form-row">
-              <Field label={w('开始', 'Starts')}>
-                <input
-                  required
-                  type="datetime-local"
-                  value={start}
-                  onChange={(e) => setStart(e.target.value)}
-                />
-              </Field>
-              <Field label={w('结束', 'Ends')}>
-                <input
-                  required
-                  type="datetime-local"
-                  value={end}
-                  onChange={(e) => setEnd(e.target.value)}
-                />
-              </Field>
-            </div>
-          )}
-          <button className="btn" disabled={action.busy}>
-            {w('新增', 'Create')}
-          </button>
-        </form>
-      )}
-      <div className="stack">
-        {q.data?.items?.map((row: Row) => (
-          <div className="panel admin-row" key={row.id}>
-            <div>
-              <strong>
-                {row.title || row.nickname || row.nameZh || row.titleZh || row.action}
-              </strong>
-              <p className="muted">{row.reason || row.nameEn || row.titleEn || row.id}</p>
-            </div>
-            {row.status && <Status value={row.status} />}
-            <div className="flex gap-2">
-              {(tab === 'listings' || tab === 'users') && (
-                <button
-                  className="chip"
-                  disabled={action.busy}
-                  onClick={() => {
-                    const reason = prompt(w('请输入处理理由', 'Reason for this action'));
-                    if (reason)
-                      void action.run(() =>
-                        api(
-                          tab === 'users'
-                            ? `/admin/users/${row.id}/restriction`
-                            : `/admin/listings/${row.id}/moderation`,
-                          'POST',
-                          tab === 'users'
-                            ? { restricted: row.status !== 'RESTRICTED', reason }
-                            : {
-                                action: row.moderationStatus === 'HIDDEN' ? 'RESTORE' : 'HIDE',
-                                reason,
-                              },
-                        ),
-                      );
-                  }}
-                >
-                  {tab === 'users'
-                    ? row.status === 'RESTRICTED'
-                      ? w('恢复', 'Restore')
-                      : w('限制', 'Restrict')
-                    : row.moderationStatus === 'HIDDEN'
-                      ? w('恢复展示', 'Restore visibility')
-                      : w('隐藏商品', 'Hide listing')}
-                </button>
-              )}
-              {tab === 'dictionaries' && (
-                <button
-                  className="chip"
-                  disabled={action.busy}
-                  onClick={() =>
-                    void action.run(() =>
-                      api(`${path}/${row.id}`, 'PATCH', {
-                        nameZh: row.nameZh,
-                        nameEn: row.nameEn,
-                        active: !row.active,
-                      }),
-                    )
-                  }
-                >
-                  {row.active ? w('停用', 'Disable') : w('启用', 'Enable')}
-                </button>
-              )}
-              {tab === 'zones' && (
-                <button
-                  className="chip"
-                  disabled={action.busy}
-                  onClick={() =>
-                    void action.run(() =>
-                      api(`${path}/${row.id}`, 'PATCH', {
-                        titleZh: row.titleZh,
-                        titleEn: row.titleEn,
-                        startsAt: row.startsAt,
-                        endsAt: row.endsAt,
-                        enabled: !row.enabled,
-                      }),
-                    )
-                  }
-                >
-                  {row.enabled ? w('停用', 'Disable') : w('启用', 'Enable')}
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
   );
 }

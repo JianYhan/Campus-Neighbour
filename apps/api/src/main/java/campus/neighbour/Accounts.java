@@ -57,9 +57,9 @@ public class Accounts {
   public Map<String, Object> register(Map<String, Object> b) {
     Input.only(b, "email", "password", "nickname");
     String email = Input.text(b, "email", 254).trim().toLowerCase(Locale.ROOT);
-    Problem.require(email.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+"), 422, "VALIDATION_ERROR");
+    Problem.field(email.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+"), "email", "INVALID_FORMAT");
     String password = Input.text(b, "password", 128);
-    Problem.require(password.length() >= 12, 422, "VALIDATION_ERROR");
+    Problem.field(password.length() >= 12, "password", "TOO_SHORT");
     String id = Db.id();
     db.exec(
       "insert into users(id,email,password_hash,nickname) values(?,?,?,?)",

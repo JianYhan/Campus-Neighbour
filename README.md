@@ -2,7 +2,7 @@
 
 校园二手交易平台 · JC2001 Introduction to Software Engineering
 
-**当前状态：首版可运行实现，待团队代码评审。** 前端连接真实Java接口，业务数据存入PostgreSQL，会话使用Redis。功能和验证范围见[实施记录](docs/implementation/README.md)。
+**当前状态：第二轮功能完善，支持桌面与移动双视图，待团队评审。** 前端连接真实Java接口，业务数据存入PostgreSQL，会话使用Redis。功能和验证范围见[实施记录](docs/implementation/README.md)。
 
 <img src="docs/implementation/screenshots/desktop.png" alt="校园邻里首页" width="850" />
 
@@ -14,9 +14,15 @@
 - 卖家预约、线下面交、买家确认、双方评价；数据库约束防止重复占用。
 - 一对一换物请求、接受／拒绝／撤回、双商品预约、双方分别确认。
 - 季节专区、站内通知、管理员隐藏商品／限制账号／维护字典与专区、处理记录。
-- 中英界面、浅色／深色主题、移动端布局；支付页只展示提示，不处理资金。
+- 中英界面、浅色／深色主题；桌面多列／聊天双栏，手机底部五项导航／独立聊天页，调整窗口尺寸保留当前表单与聊天草稿。
+- 交易类型与状态、换物方向与状态、未读通知及后台筛选；列表按游标加载更多。
+- 字典与季节专区完整编辑，表单错误指出具体字段；支付页只展示提示，不处理资金。
 
 地图、美食、生活指南、真实支付／担保仍为Future Work。快捷聊天由对方本人回复，不调用AI。
+
+## 桌面与移动双视图
+
+同一地址自动适配：大于720px使用桌面布局，720px及以下使用手机布局。两端共用账号和业务数据；手机有逛一逛、消息、发布、交易、我的五项底部导航。聊天在桌面同时展示会话列表和内容，手机进入独立聊天页后可返回列表。已检查360、390、768、1440px宽度，详见[第二轮记录](docs/implementation/iteration-2.md)。
 
 ## 本地启动
 
@@ -77,7 +83,7 @@ pnpm --filter @campus/web exec playwright install chromium
 pnpm test:e2e
 ```
 
-GitHub Actions包含前端、后端和浏览器测试任务。首版代码`b1cf75c`的[远程检查全部通过](https://github.com/JianYhan/Campus-Neighbour/actions/runs/35429970574)：14项后端测试、6项前端测试、2项浏览器端到端测试，以及前后端构建和格式检查。后续提交以对应Checks结果为准。
+GitHub Actions包含前端、后端和浏览器测试任务。首版代码`b1cf75c`的[远程检查全部通过](https://github.com/JianYhan/Campus-Neighbour/actions/runs/35429970574)：14项后端测试、6项前端测试、2项浏览器端到端测试，以及前后端构建和格式检查。第二轮本地25项后端、28项前端测试及构建通过，增加3项双视图端到端测试；本轮远程结果见[第二轮记录](docs/implementation/iteration-2.md)。后续提交以对应Checks结果为准。
 
 ## 项目结构与技术
 

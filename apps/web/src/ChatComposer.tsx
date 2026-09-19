@@ -3,6 +3,18 @@ import { countCharacters, validMessage } from './chat-rules';
 export function ChatComposer({
   locale,
   send,
+  conversationId,
+}: {
+  locale: string;
+  send: (body: Record<string, string>) => Promise<void>;
+  conversationId?: string;
+}) {
+  return <Composer key={conversationId || 'conversation'} locale={locale} send={send} />;
+}
+
+function Composer({
+  locale,
+  send,
 }: {
   locale: string;
   send: (body: Record<string, string>) => Promise<void>;

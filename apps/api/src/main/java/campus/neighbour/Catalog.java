@@ -146,7 +146,25 @@ public class Catalog {
   }
 
   void dictionary(Object id, String kind) {
-    db.one("select id from dictionaries where id=? and kind=? and active", id, kind);
+    dictionary(id, kind, false);
+  }
+
+  void dictionary(Object id, String kind, boolean allowInactive) {
+    String field = switch (kind) {
+      case "categories" -> "categoryId";
+      case "buildings" -> "buildingId";
+      default -> "courseId";
+    };
+    Problem.field(
+      db.optional(
+        "select id from dictionaries where id=? and kind=? and (? or active)",
+        id,
+        kind,
+        allowInactive
+      ) != null,
+      field,
+      "INVALID_REFERENCE"
+    );
   }
 
   @SuppressWarnings("unchecked")
@@ -188,24 +206,28 @@ public class Catalog {
       description = Input.text(b, "description", 2000),
       category = Input.id(b, "categoryId"),
       building = Input.id(b, "buildingId"),
-      course = Input.optional(b, "courseId", 36),
+      course = Input.optionalId(b, "courseId"),
       condition = Input.text(b, "conditionCode", 20);
     dictionary(category, "categories");
     dictionary(building, "buildings");
     if (course != null) dictionary(course, "courses");
-    Problem.require(
+    Problem.field(
       Set.of("NEW", "LIKE_NEW", "GOOD", "FAIR").contains(condition),
-      422,
-      "VALIDATION_ERROR"
+      "conditionCode",
+      "INVALID_FORMAT"
     );
     long price = Input.number(b, "priceMinor", 0, 999999999);
-    Problem.require(b.get("imageIds") instanceof List<?>, 422, "VALIDATION_ERROR");
-    List<String> images = (List<String>) b.get("imageIds");
-    Problem.require(
-      images.size() >= 1 && images.size() <= 6 && new HashSet<>(images).size() == images.size(),
-      422,
-      "VALIDATION_ERROR"
+    Problem.field(b.get("imageIds") != null, "imageIds", "REQUIRED");
+    Problem.field(b.get("imageIds") instanceof List<?>, "imageIds", "INVALID_FORMAT");
+    List<?> rawImages = (List<?>) b.get("imageIds");
+    Problem.field(rawImages.size() >= 1 && rawImages.size() <= 6, "imageIds", "OUT_OF_RANGE");
+    Problem.field(
+      new HashSet<>(rawImages).size() == rawImages.size() &&
+        rawImages.stream().allMatch(i -> i instanceof String),
+      "imageIds",
+      "INVALID_FORMAT"
     );
+    List<String> images = (List<String>) rawImages;
     for (String image : images) {
       db.one("select id from images where id=? and owner_id=? for update", image, owner);
       var used = db.optional("select listing_id from listing_images where image_id=?", image);
@@ -215,7 +237,7 @@ public class Catalog {
         "STATE_CONFLICT"
       );
     }
-    boolean swap = Boolean.TRUE.equals(b.get("swapEnabled"));
+    boolean swap = Input.bool(b, "swapEnabled", false);
     if (id == null) {
       id = Db.id();
       db.exec(

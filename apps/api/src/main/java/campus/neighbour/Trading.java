@@ -48,17 +48,37 @@ class Trading {
     return t;
   }
 
-  List<Map<String, Object>> list() {
+  Map<String, Object> list(Map<String, String> q) {
     String actor = a.actor();
-    return db
-      .rows(
-        "select id from trades where initiator_id=? or counterparty_id=? order by created_at desc limit 100",
-        actor,
-        actor
-      )
-      .stream()
-      .map(t -> detail((String) t.get("id")))
-      .toList();
+    String role = Pages.choice(q, "role", "buyer", "seller", "swap");
+    String status = Pages.choice(
+      q,
+      "status",
+      "WAITING_MEETUP",
+      "PARTIALLY_CONFIRMED",
+      "COMPLETED",
+      "CANCELLED"
+    );
+    String sql = "select * from trades where (initiator_id=? or counterparty_id=?)";
+    var p = new ArrayList<Object>(List.of(actor, actor));
+    if (role != null) {
+      if (role.equals("swap")) sql += " and kind='SWAP'";
+      else {
+        sql +=
+          " and kind='SALE' and " +
+          (role.equals("buyer") ? "counterparty_id" : "initiator_id") +
+          "=?";
+        p.add(actor);
+      }
+    }
+    if (status != null) {
+      sql += " and status=?";
+      p.add(status);
+    }
+    return Pages.map(
+      Pages.of(db, q, "trades:" + actor, sql, p, "created_at", "createdAt", "::timestamptz", false),
+      row -> detail((String) row.get("id"))
+    );
   }
 
   void available(Map<String, Object> l) {
@@ -122,6 +142,13 @@ class Trading {
       Input.only(b, "conversationId", "meetingLocation", "meetingAt", "expectedListingVersion");
       var c = chat.conversation(Input.id(b, "conversationId"), false);
       Problem.require(actor.equals(c.get("sellerId")), 403, "FORBIDDEN");
+      Problem.require(
+        "ACTIVE".equals(
+          db.one("select status from users where id=? for share", c.get("buyerId")).get("status")
+        ),
+        403,
+        "ACCOUNT_RESTRICTED"
+      );
       var l = catalog.raw((String) c.get("listingId"), true);
       available(l);
       Problem.require(
@@ -299,12 +326,30 @@ class Trading {
     );
   }
 
-  List<Map<String, Object>> swaps() {
+  Map<String, Object> swaps(Map<String, String> q) {
     String actor = a.actor();
-    return db.rows(
-      "select * from swap_requests where proposer_id=? or recipient_id=? order by created_at desc limit 100",
-      actor,
-      actor
+    String direction = Pages.choice(q, "direction", "sent", "received");
+    String status = Pages.choice(q, "status", "PENDING", "ACCEPTED", "REJECTED", "WITHDRAWN");
+    String sql = "select * from swap_requests where (proposer_id=? or recipient_id=?)";
+    var p = new ArrayList<Object>(List.of(actor, actor));
+    if (direction != null) {
+      sql += " and " + (direction.equals("sent") ? "proposer_id" : "recipient_id") + "=?";
+      p.add(actor);
+    }
+    if (status != null) {
+      sql += " and status=?";
+      p.add(status);
+    }
+    return Pages.of(
+      db,
+      q,
+      "swaps:" + actor,
+      sql,
+      p,
+      "created_at",
+      "createdAt",
+      "::timestamptz",
+      false
     );
   }
 

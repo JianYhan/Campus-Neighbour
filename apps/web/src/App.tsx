@@ -25,6 +25,8 @@ import {
   refreshCsrf,
   queryClient,
   useApi,
+  usePagedApi,
+  LoadMore,
   useMe,
   usePreferences,
   useWords,
@@ -93,7 +95,11 @@ export function App() {
             </span>
           </span>
         </Link>
-        <nav className={menu ? 'top-nav open' : 'top-nav'}>
+        <nav
+          id="primary-navigation"
+          aria-label={w('主导航', 'Main navigation')}
+          className={menu ? 'top-nav open' : 'top-nav'}
+        >
           {links.map(([to, label]) => (
             <Link
               key={to}
@@ -143,7 +149,13 @@ export function App() {
             <Plus size={17} />
             {w('发布闲置', 'List an item')}
           </Link>
-          <button className="mobile-menu icon-btn" aria-label="Menu" onClick={() => setMenu(!menu)}>
+          <button
+            className="mobile-menu icon-btn"
+            aria-label={w('菜单', 'Menu')}
+            aria-expanded={menu}
+            aria-controls="primary-navigation"
+            onClick={() => setMenu(!menu)}
+          >
             <Menu />
           </button>
         </div>
@@ -158,15 +170,15 @@ export function App() {
         ) : page === 'publish' ? (
           <Editor />
         ) : page === 'edit' ? (
-          <Editor id={id} />
+          <Editor key={id} id={id} />
         ) : page === 'profile' ? (
-          <Profile id={id} />
+          <Profile key={id || 'self'} id={id} />
         ) : page === 'mine' ? (
           <MyListings />
         ) : page === 'messages' ? (
           <Messages id={id} />
         ) : page === 'trades' ? (
-          <Trades id={id} />
+          <Trades key={id || 'list'} id={id} />
         ) : page === 'swaps' ? (
           <Swaps />
         ) : page === 'admin' ? (
@@ -208,11 +220,27 @@ export function App() {
           )}
         </div>
       </footer>
-      <nav className="bottom-nav">
-        <Link to="/">{w('逛一逛', 'Explore')}</Link>
-        <Link to="/messages">{w('消息', 'Messages')}</Link>
-        <Link to="/trades">{w('交易', 'Trades')}</Link>
-        <Link to="/profile">{w('我的', 'Me')}</Link>
+      <nav className="bottom-nav" aria-label={w('移动导航', 'Mobile navigation')}>
+        <Link to="/" aria-current={!page ? 'page' : undefined}>
+          {w('逛一逛', 'Explore')}
+        </Link>
+        <Link to="/messages" aria-current={page === 'messages' ? 'page' : undefined}>
+          {w('消息', 'Messages')}
+        </Link>
+        <Link
+          to={me.data ? '/publish' : '/login'}
+          className="mobile-publish"
+          aria-label={w('发布闲置', 'List an item')}
+        >
+          <Plus size={20} />
+          <span>{w('发布', 'Sell')}</span>
+        </Link>
+        <Link to="/trades" aria-current={page === 'trades' ? 'page' : undefined}>
+          {w('交易', 'Trades')}
+        </Link>
+        <Link to="/profile" aria-current={page === 'profile' ? 'page' : undefined}>
+          {w('我的', 'Me')}
+        </Link>
       </nav>
     </div>
   );
@@ -525,6 +553,7 @@ function Listing({ id }: { id: string }) {
   const item = useApi('/listings/' + id);
   const me = useMe();
   const w = useWords();
+  const locale = usePreferences((s) => s.locale);
   const nav = useNavigate();
   const action = useAction();
   const [picture, setPicture] = useState(0);
@@ -561,11 +590,31 @@ function Listing({ id }: { id: string }) {
           <div className="details-table">
             <p>
               <span>{w('地点', 'Location')}</span>
-              {l.building?.[usePreferences.getState().locale === 'en' ? 'nameEn' : 'nameZh']}
+              {l.building?.[locale === 'en' ? 'nameEn' : 'nameZh']}
             </p>
             <p>
               <span>{w('课程 / 版本', 'Course / edition')}</span>
-              {l.course?.nameZh || '—'} / {l.bookEdition || '—'}
+              {l.course?.[locale === 'en' ? 'nameEn' : 'nameZh'] || '—'} / {l.bookEdition || '—'}
+            </p>
+            {l.bookAuthor && (
+              <p>
+                <span>{w('作者', 'Author')}</span>
+                {l.bookAuthor}
+              </p>
+            )}
+            <p>
+              <span>{w('成色', 'Condition')}</span>
+              {w(
+                (
+                  {
+                    NEW: '全新',
+                    LIKE_NEW: '几乎全新',
+                    GOOD: '状态良好',
+                    FAIR: '正常使用',
+                  } as Record<string, string>
+                )[l.conditionCode] || '',
+                l.conditionCode?.replaceAll('_', ' ').toLowerCase(),
+              )}
             </p>
             {l.wantedDescription && (
               <p>
@@ -626,11 +675,25 @@ function Listing({ id }: { id: string }) {
   );
 }
 function MyListings() {
-  const q = useApi('/me/listings');
+  const [status, setStatus] = useState('');
+  const q = usePagedApi('/me/listings' + (status ? '?status=' + status : ''));
   const w = useWords();
   return (
     <section className="page">
       <h1>{w('我的商品', 'My listings')}</h1>
+      <div className="list-filters">
+        <label className="field">
+          <span>{w('商品状态', 'Listing status')}</span>
+          <select value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">{w('全部状态', 'All statuses')}</option>
+            <option value="AVAILABLE">{w('可交易', 'Available')}</option>
+            <option value="RESERVED">{w('已预约', 'Reserved')}</option>
+            <option value="SOLD">{w('已售出', 'Sold')}</option>
+            <option value="EXCHANGED">{w('已交换', 'Exchanged')}</option>
+            <option value="WITHDRAWN">{w('已下架', 'Withdrawn')}</option>
+          </select>
+        </label>
+      </div>
       <ErrorNotice error={q.error} />
       {q.isPending ? (
         <Loading />
@@ -643,16 +706,17 @@ function MyListings() {
             </div>
           ))}
         </div>
-      ) : (
-        <Empty />
-      )}
+      ) : !q.error ? (
+        <Empty text={w('当前筛选下没有商品。', 'No listings match these filters.')} />
+      ) : null}
+      <LoadMore query={q} />
     </section>
   );
 }
 function Zones({ id }: { id?: string }) {
   const w = useWords();
   const locale = usePreferences((s) => s.locale);
-  const q = useApi(id ? `/zones/${id}/listings` : '/zones');
+  const q = usePagedApi(id ? `/zones/${id}/listings` : '/zones');
   return (
     <section className="page">
       <div className="eyebrow">SEASONAL COLLECTIONS</div>
@@ -680,7 +744,8 @@ function Zones({ id }: { id?: string }) {
           ))}
         </div>
       )}
-      {!q.isPending && !q.data?.items?.length && <Empty />}
+      {!q.isPending && !q.error && !q.data?.items?.length && <Empty />}
+      <LoadMore query={q} />
     </section>
   );
 }

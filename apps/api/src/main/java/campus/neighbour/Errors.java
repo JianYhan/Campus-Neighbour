@@ -11,7 +11,7 @@ class Errors {
 
   @ExceptionHandler(Problem.class)
   ResponseEntity<?> problem(Problem p) {
-    return error(p.status, p.code);
+    return error(p.status, p.code, p.fieldErrors);
   }
 
   @ExceptionHandler({
@@ -34,10 +34,14 @@ class Errors {
   }
 
   ResponseEntity<?> error(int status, String code) {
+    return error(status, code, Map.of());
+  }
+
+  ResponseEntity<?> error(int status, String code, Map<String, String> fields) {
     return ResponseEntity.status(status).body(
       Map.of(
         "error",
-        Map.of("code", code, "message", code, "fieldErrors", Map.of(), "requestId", Db.id())
+        Map.of("code", code, "message", code, "fieldErrors", fields, "requestId", Db.id())
       )
     );
   }

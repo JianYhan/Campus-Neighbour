@@ -52,37 +52,54 @@ class Chat {
     );
   }
 
-  List<Map<String, Object>> list() {
+  Map<String, Object> detail(String id) {
+    return enrich(conversation(id, false));
+  }
+
+  Map<String, Object> enrich(Map<String, Object> c) {
     String actor = a.actor();
-    return db
-      .rows(
-        "select * from conversations where buyer_id=? or seller_id=? order by updated_at desc limit 100",
-        actor,
-        actor
+    var l = catalog.raw((String) c.get("listingId"), false);
+    c.put("listingSummary", Map.of("title", l.get("title"), "priceMinor", l.get("priceMinor")));
+    String other = (String) (actor.equals(c.get("buyerId")) ? c.get("sellerId") : c.get("buyerId"));
+    c.put("otherUser", a.profile(other));
+    c.put(
+      "lastMessage",
+      db.optional(
+        "select * from messages where conversation_id=? order by sequence desc limit 1",
+        c.get("id")
       )
-      .stream()
-      .map(c -> {
-        var l = catalog.raw((String) c.get("listingId"), false);
-        c.put("listingSummary", Map.of("title", l.get("title"), "priceMinor", l.get("priceMinor")));
-        String other = (String) (
-          actor.equals(c.get("buyerId")) ? c.get("sellerId") : c.get("buyerId")
-        );
-        c.put("otherUser", a.profile(other));
-        c.put(
-          "unreadCount",
-          db
-            .one(
-              "select count(*) as count from messages where conversation_id=? and sender_id<>? and sequence>coalesce((select sequence from conversation_reads where conversation_id=? and user_id=?),0)",
-              c.get("id"),
-              actor,
-              c.get("id"),
-              actor
-            )
-            .get("count")
-        );
-        return c;
-      })
-      .toList();
+    );
+    c.put(
+      "unreadCount",
+      db
+        .one(
+          "select count(*) as count from messages where conversation_id=? and sender_id<>? and sequence>coalesce((select sequence from conversation_reads where conversation_id=? and user_id=?),0)",
+          c.get("id"),
+          actor,
+          c.get("id"),
+          actor
+        )
+        .get("count")
+    );
+    return c;
+  }
+
+  Map<String, Object> list(Map<String, String> q) {
+    String actor = a.actor();
+    return Pages.map(
+      Pages.of(
+        db,
+        q,
+        "conversations:" + actor,
+        "select * from conversations where (buyer_id=? or seller_id=?)",
+        List.of(actor, actor),
+        "updated_at",
+        "updatedAt",
+        "::timestamptz",
+        false
+      ),
+      this::enrich
+    );
   }
 
   Map<String, Object> history(String id, Map<String, String> q) {
@@ -93,14 +110,18 @@ class Chat {
       "VALIDATION_ERROR"
     );
     boolean after = q.containsKey("afterCursor");
-    long cursor = Long.parseLong(
-      q.getOrDefault(
-        after ? "afterCursor" : "beforeCursor",
-        after ? "0" : String.valueOf(Long.MAX_VALUE)
-      )
-    );
-    int limit = Integer.parseInt(q.getOrDefault("limit", "50"));
-    Problem.require(limit > 0 && limit <= 100, 422, "VALIDATION_ERROR");
+    String cursorName = after ? "afterCursor" : "beforeCursor";
+    long cursor;
+    try {
+      cursor = Long.parseLong(
+        q.getOrDefault(cursorName, after ? "0" : String.valueOf(Long.MAX_VALUE))
+      );
+    } catch (NumberFormatException e) {
+      throw Problem.field(cursorName, "INVALID_FORMAT");
+    }
+    Problem.field(cursor >= 0, cursorName, "OUT_OF_RANGE");
+
+    int limit = Pages.limit(q);
     var rows = new ArrayList<>(
       db.rows(
         "select * from messages where conversation_id=? and sequence" +
@@ -197,6 +218,17 @@ class Chat {
       actor,
       m.get("sequence")
     );
-    return Map.of("unreadCount", 0);
+    return Map.of(
+      "unreadCount",
+      db
+        .one(
+          "select count(*) as count from messages where conversation_id=? and sender_id<>? and sequence>coalesce((select sequence from conversation_reads where conversation_id=? and user_id=?),0)",
+          id,
+          actor,
+          id,
+          actor
+        )
+        .get("count")
+    );
   }
 }

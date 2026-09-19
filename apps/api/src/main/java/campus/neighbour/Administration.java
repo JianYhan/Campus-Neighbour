@@ -61,9 +61,17 @@ class Administration {
   Map<String, Object> dictionary(String kind, String id, Map<String, Object> b) {
     a.admin();
     Problem.require(Set.of("categories", "courses", "buildings").contains(kind), 404, "NOT_FOUND");
+    Input.only(b, "nameZh", "nameEn", "active");
+    if (id != null) {
+      var merged = new LinkedHashMap<>(
+        db.one("select * from dictionaries where id=? and kind=?", id, kind)
+      );
+      merged.putAll(b);
+      b = merged;
+    }
     String zh = Input.text(b, "nameZh", 100),
       en = Input.text(b, "nameEn", 100);
-    boolean active = !Boolean.FALSE.equals(b.get("active"));
+    boolean active = Input.bool(b, "active", true);
     if (id == null) {
       id = Db.id();
       db.exec("insert into dictionaries values(?,?,?,?,?)", id, kind, zh, en, active);
@@ -81,19 +89,46 @@ class Administration {
   @Transactional
   Map<String, Object> zone(String id, Map<String, Object> b) {
     a.admin();
+    Input.only(
+      b,
+      "titleZh",
+      "titleEn",
+      "descriptionZh",
+      "descriptionEn",
+      "startsAt",
+      "endsAt",
+      "enabled",
+      "categoryId",
+      "buildingId"
+    );
+    Map<String, Object> previous =
+      id == null ? Map.of() : db.one("select * from seasonal_zones where id=? for update", id);
+    if (id != null) {
+      var merged = new LinkedHashMap<>(previous);
+      merged.putAll(b);
+      b = merged;
+    }
     String zh = Input.text(b, "titleZh", 100),
       en = Input.text(b, "titleEn", 100),
-      start = Input.text(b, "startsAt", 60),
-      end = Input.text(b, "endsAt", 60);
-    Problem.require(
+      start = Input.instant(b, "startsAt"),
+      end = Input.instant(b, "endsAt");
+    Problem.field(
       java.time.Instant.parse(end).isAfter(java.time.Instant.parse(start)),
-      422,
-      "VALIDATION_ERROR"
+      "endsAt",
+      "OUT_OF_RANGE"
     );
-    String category = Input.optional(b, "categoryId", 36),
-      building = Input.optional(b, "buildingId", 36);
-    if (category != null) catalog.dictionary(category, "categories");
-    if (building != null) catalog.dictionary(building, "buildings");
+    String category = Input.optionalId(b, "categoryId"),
+      building = Input.optionalId(b, "buildingId");
+    if (category != null) catalog.dictionary(
+      category,
+      "categories",
+      category.equals(previous.get("categoryId"))
+    );
+    if (building != null) catalog.dictionary(
+      building,
+      "buildings",
+      building.equals(previous.get("buildingId"))
+    );
     if (id == null) {
       id = Db.id();
       db.exec(
@@ -105,7 +140,7 @@ class Administration {
         Input.optional(b, "descriptionEn", 1000),
         start,
         end,
-        !Boolean.FALSE.equals(b.get("enabled")),
+        Input.bool(b, "enabled", true),
         category,
         building
       );
@@ -117,7 +152,7 @@ class Administration {
       Input.optional(b, "descriptionEn", 1000),
       start,
       end,
-      !Boolean.FALSE.equals(b.get("enabled")),
+      Input.bool(b, "enabled", true),
       category,
       building,
       id

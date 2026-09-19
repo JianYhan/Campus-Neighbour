@@ -540,4 +540,642 @@ class FlowsTest {
     student.request("POST", "/listings", Map.of(), 403);
     assertTrue(db.rows("select * from moderation_logs where target_id=?", student.id).size() > 0);
   }
+
+  @SuppressWarnings("unchecked")
+  List<Map<String, Object>> items(Map<String, Object> page) {
+    return (List<Map<String, Object>>) page.get("items");
+  }
+
+  Map<String, Object> fields(Map<String, Object> failure) {
+    return (Map<String, Object>) ((Map<?, ?>) failure.get("error")).get("fieldErrors");
+  }
+
+  String seededTrade(Client seller, Client buyer, String kind, String status) {
+    String id = Db.id();
+    db.exec(
+      "insert into trades(id,kind,initiator_id,counterparty_id,status,meeting_location,meeting_at,created_at) values(?,?,?,?,?,'Library',now()+interval '1 day','2026-01-01T00:00:00Z')",
+      id,
+      kind,
+      seller.id,
+      buyer.id,
+      status
+    );
+    return id;
+  }
+
+  @Test
+  void round2TradePagesRespectRoleStatusAndStableBoundary() throws Exception {
+    var me = user();
+    var other = user();
+    var stranger = user();
+    var firstId = seededTrade(me, other, "SALE", "WAITING_MEETUP");
+    var secondId = seededTrade(me, other, "SALE", "WAITING_MEETUP");
+    seededTrade(me, other, "SALE", "COMPLETED");
+    var boughtId = seededTrade(other, me, "SALE", "WAITING_MEETUP");
+    var swapId = seededTrade(me, other, "SWAP", "WAITING_MEETUP");
+    seededTrade(other, stranger, "SALE", "WAITING_MEETUP");
+    var first = me.request("GET", "/trades?role=seller&status=WAITING_MEETUP&limit=1", null, 200);
+    assertEquals(1, items(first).size());
+    assertNotNull(first.get("nextCursor"));
+    String newer = seededTrade(me, other, "SALE", "WAITING_MEETUP");
+    db.exec("update trades set created_at=now() where id=?", newer);
+    var second = me.request(
+      "GET",
+      "/trades?role=seller&status=WAITING_MEETUP&limit=1&cursor=" + first.get("nextCursor"),
+      null,
+      200
+    );
+    assertEquals(1, items(second).size());
+    assertEquals(
+      Set.of(firstId, secondId),
+      Set.of(items(first).getFirst().get("id"), items(second).getFirst().get("id"))
+    );
+    assertTrue(second.containsKey("nextCursor"));
+    assertNull(second.get("nextCursor"));
+    assertEquals(
+      boughtId,
+      items(me.request("GET", "/trades?role=buyer", null, 200))
+        .getFirst()
+        .get("id")
+    );
+    assertEquals(
+      swapId,
+      items(me.request("GET", "/trades?role=swap", null, 200))
+        .getFirst()
+        .get("id")
+    );
+    me.request("GET", "/trades?role=invalid", null, 422);
+    me.request("GET", "/trades?limit=101", null, 422);
+    me.request("GET", "/trades?cursor=invalid", null, 422);
+    me.request("GET", "/trades?role=buyer&cursor=" + first.get("nextCursor"), null, 422);
+  }
+
+  @Test
+  void round2ConversationDetailIsEnrichedAndPrivate() throws Exception {
+    var seller = user();
+    var buyer = user();
+    var outsider = user();
+    String first = null;
+    for (int n = 0; n < 3; n++) {
+      String cid = (String) buyer
+        .request("POST", "/conversations", Map.of("listingId", listing(seller).get("id")), 201)
+        .get("id");
+      if (first == null) first = cid;
+    }
+    buyer.request(
+      "POST",
+      "/conversations/" + first + "/messages",
+      Map.of("clientMessageId", Db.id(), "kind", "TEXT", "text", "hello"),
+      201
+    );
+    var detail = seller.request("GET", "/conversations/" + first, null, 200);
+    assertEquals("hello", ((Map<?, ?>) detail.get("lastMessage")).get("body"));
+    assertEquals(buyer.id, ((Map<?, ?>) detail.get("otherUser")).get("userId"));
+    assertNotNull(detail.get("listingSummary"));
+    assertEquals(1, ((Number) detail.get("unreadCount")).intValue());
+    outsider.request("GET", "/conversations/" + first, null, 404);
+    var page = seller.request("GET", "/conversations?limit=2", null, 200);
+    assertEquals(2, items(page).size());
+    assertNotNull(page.get("nextCursor"));
+    var next = seller.request(
+      "GET",
+      "/conversations?limit=2&cursor=" + page.get("nextCursor"),
+      null,
+      200
+    );
+    assertEquals(1, items(next).size());
+    assertNull(next.get("nextCursor"));
+  }
+
+  @Test
+  void round2NotificationsSwapsAndPublicReviewsPaginate() throws Exception {
+    var me = user();
+    var other = user();
+    var stranger = user();
+    String mine = (String) listing(me).get("id"),
+      theirs = (String) listing(other).get("id");
+    for (int n = 0; n < 3; n++) {
+      String tid = seededTrade(me, other, "SALE", "COMPLETED");
+      db.exec(
+        "insert into reviews(id,trade_id,author_id,recipient_id,rating,comment) values(?,?,?,?,5,'Good')",
+        Db.id(),
+        tid,
+        other.id,
+        me.id
+      );
+      db.exec(
+        "insert into notifications(id,user_id,type,resource_type,resource_id,read_at) values(?,?,'TRADE_CHANGED','trade',?,case when ? then now() else null end)",
+        Db.id(),
+        me.id,
+        tid,
+        n == 2
+      );
+      db.exec(
+        "insert into swap_requests(id,proposer_id,recipient_id,offered_listing_id,requested_listing_id,offered_version,requested_version,meeting_location,meeting_at,status) values(?,?,?,?,?,1,1,'Library',now()+interval '1 day',?)",
+        Db.id(),
+        me.id,
+        other.id,
+        mine,
+        theirs,
+        n == 2 ? "WITHDRAWN" : "PENDING"
+      );
+    }
+    var notifications = me.request("GET", "/notifications?unreadOnly=true&limit=1", null, 200);
+    assertEquals(1, items(notifications).size());
+    assertNotNull(notifications.get("nextCursor"));
+    var next = me.request(
+      "GET",
+      "/notifications?unreadOnly=true&limit=1&cursor=" + notifications.get("nextCursor"),
+      null,
+      200
+    );
+    assertEquals(1, items(next).size());
+    assertNull(next.get("nextCursor"));
+    assertEquals(0, items(stranger.request("GET", "/notifications", null, 200)).size());
+    assertEquals(
+      0,
+      items(me.request("GET", "/swap-requests?direction=received", null, 200)).size()
+    );
+    var swaps = me.request(
+      "GET",
+      "/swap-requests?direction=sent&status=PENDING&limit=1",
+      null,
+      200
+    );
+    assertEquals(1, items(swaps).size());
+    assertNotNull(swaps.get("nextCursor"));
+    other.request(
+      "GET",
+      "/swap-requests?direction=received&status=PENDING&limit=1&cursor=" + swaps.get("nextCursor"),
+      null,
+      422
+    );
+  }
+
+  @Test
+  void round2ReviewsAndAdminListsHaveBoundariesAndFilters() throws Exception {
+    var admin = user();
+    var student = user();
+    var other = user();
+    db.exec("update users set role='ADMIN' where id=?", admin.id);
+    db.exec(
+      "update users set nickname='UniqueRoundTwo',status='RESTRICTED' where id=?",
+      student.id
+    );
+    for (int n = 0; n < 3; n++) {
+      String tid = seededTrade(student, other, "SALE", "COMPLETED");
+      db.exec(
+        "insert into reviews(id,trade_id,author_id,recipient_id,rating,comment) values(?,?,?,?,5,'Good')",
+        Db.id(),
+        tid,
+        other.id,
+        student.id
+      );
+      db.exec(
+        "insert into moderation_logs(id,actor_id,target_type,target_id,action,reason) values(?,?,'user',?,'true','test')",
+        Db.id(),
+        admin.id,
+        student.id
+      );
+      db.exec(
+        "insert into seasonal_zones(id,title_zh,title_en,starts_at,ends_at,enabled) values(?,'专区','Collection','2026-01-01T00:00:00Z','2027-01-01T00:00:00Z',false)",
+        Db.id()
+      );
+    }
+    var reviews = new Client().request(
+      "GET",
+      "/users/" + student.id + "/reviews?limit=2",
+      null,
+      200
+    );
+    assertEquals(2, items(reviews).size());
+    assertNotNull(reviews.get("nextCursor"));
+    assertFalse(items(reviews).getFirst().containsKey("tradeId"));
+    var last = new Client().request(
+      "GET",
+      "/users/" + student.id + "/reviews?limit=2&cursor=" + reviews.get("nextCursor"),
+      null,
+      200
+    );
+    assertEquals(1, items(last).size());
+    assertNull(last.get("nextCursor"));
+    assertEquals(
+      student.id,
+      items(admin.request("GET", "/admin/users?q=UniqueRoundTwo&status=RESTRICTED", null, 200))
+        .getFirst()
+        .get("id")
+    );
+    assertEquals(
+      0,
+      items(admin.request("GET", "/admin/users?q=UniqueRoundTwo&status=ACTIVE", null, 200)).size()
+    );
+    for (String path : List.of(
+      "/admin/users",
+      "/admin/dictionaries/categories",
+      "/admin/zones",
+      "/admin/audit-logs?targetType=user&targetId=" + student.id
+    )) {
+      String separator = path.contains("?") ? "&" : "?";
+      var page = admin.request("GET", path + separator + "limit=1", null, 200);
+      assertEquals(1, items(page).size(), path);
+      assertNotNull(page.get("nextCursor"), path);
+      var next = admin.request(
+        "GET",
+        path + separator + "limit=1&cursor=" + page.get("nextCursor"),
+        null,
+        200
+      );
+      assertNotEquals(items(page).getFirst().get("id"), items(next).getFirst().get("id"), path);
+    }
+    student.request("GET", "/admin/zones?limit=1", null, 403);
+  }
+
+  @Test
+  void round2RestrictedBuyerCannotBeReservedButCanFinishExistingTrade() throws Exception {
+    var seller = user();
+    var buyer = user();
+    String existing = (String) buyer
+      .request("POST", "/conversations", Map.of("listingId", listing(seller).get("id")), 201)
+      .get("id");
+    String pending = (String) buyer
+      .request("POST", "/conversations", Map.of("listingId", listing(seller).get("id")), 201)
+      .get("id");
+    String tid = (String) seller.request("POST", "/trades", meeting(existing), 201).get("id");
+    db.exec("update users set status='RESTRICTED' where id=?", buyer.id);
+    seller.request("POST", "/trades", meeting(pending), 403);
+    assertEquals(
+      "COMPLETED",
+      buyer.request("POST", "/trades/" + tid + "/confirm-receipt", Map.of(), 200).get("status")
+    );
+  }
+
+  @Test
+  void round2ValidationIdentifiesFieldsAndRejectsInvalidZoneReferences() throws Exception {
+    var visitor = new Client();
+    visitor.token();
+    assertEquals(
+      "INVALID_FORMAT",
+      fields(
+        visitor.request(
+          "POST",
+          "/auth/register",
+          Map.of("email", "not-an-email", "nickname", "A", "password", "Campus-test-123!"),
+          422
+        )
+      ).get("email")
+    );
+    assertEquals(
+      "TOO_SHORT",
+      fields(
+        visitor.request(
+          "POST",
+          "/auth/register",
+          Map.of("email", Db.id() + "@example.test", "nickname", "A", "password", "short"),
+          422
+        )
+      ).get("password")
+    );
+    var seller = user();
+    var buyer = user();
+    var admin = user();
+    db.exec("update users set role='ADMIN' where id=?", admin.id);
+    assertEquals(
+      "REQUIRED",
+      fields(seller.request("POST", "/listings", Map.of(), 422)).get("title")
+    );
+    String cid = (String) buyer
+      .request("POST", "/conversations", Map.of("listingId", listing(seller).get("id")), 201)
+      .get("id");
+    var body = new HashMap<String, Object>(meeting(cid));
+    body.put("meetingAt", "2020-01-01T00:00:00Z");
+    assertEquals(
+      "MUST_BE_FUTURE",
+      fields(seller.request("POST", "/trades", body, 422)).get("meetingAt")
+    );
+    body.put("meetingAt", "not-a-date");
+    assertEquals(
+      "INVALID_FORMAT",
+      fields(seller.request("POST", "/trades", body, 422)).get("meetingAt")
+    );
+    var zone = new HashMap<String, Object>(
+      Map.of(
+        "titleZh",
+        "专区",
+        "titleEn",
+        "Collection",
+        "startsAt",
+        "2026-01-01T00:00:00Z",
+        "endsAt",
+        "2027-01-01T00:00:00Z",
+        "categoryId",
+        "22222222-2222-4222-8222-222222222221"
+      )
+    );
+    assertEquals(
+      "INVALID_REFERENCE",
+      fields(admin.request("POST", "/admin/zones", zone, 422)).get("categoryId")
+    );
+    zone.remove("categoryId");
+    zone.put("buildingId", Db.id());
+    assertEquals(
+      "INVALID_REFERENCE",
+      fields(admin.request("POST", "/admin/zones", zone, 422)).get("buildingId")
+    );
+  }
+
+  @Test
+  void round2AdminPartialUpdatesPreserveZoneCriteriaAndDictionaryNames() throws Exception {
+    var admin = user();
+    db.exec("update users set role='ADMIN' where id=?", admin.id);
+    var zone = admin.request(
+      "POST",
+      "/admin/zones",
+      Map.of(
+        "titleZh",
+        "专区",
+        "titleEn",
+        "Collection",
+        "descriptionZh",
+        "旧说明",
+        "descriptionEn",
+        "Original description",
+        "startsAt",
+        "2026-01-01T00:00:00Z",
+        "endsAt",
+        "2027-01-01T00:00:00Z",
+        "categoryId",
+        "11111111-1111-4111-8111-111111111111",
+        "buildingId",
+        "22222222-2222-4222-8222-222222222221"
+      ),
+      201
+    );
+    var edited = admin.request(
+      "PATCH",
+      "/admin/zones/" + zone.get("id"),
+      Map.of("enabled", false),
+      200
+    );
+    assertEquals(zone.get("categoryId"), edited.get("categoryId"));
+    assertEquals(zone.get("buildingId"), edited.get("buildingId"));
+    assertEquals("Original description", edited.get("descriptionEn"));
+    assertEquals(false, edited.get("enabled"));
+    var dictionary = admin.request(
+      "POST",
+      "/admin/dictionaries/categories",
+      Map.of("nameZh", "新分类", "nameEn", "New category"),
+      201
+    );
+    var changed = admin.request(
+      "PATCH",
+      "/admin/dictionaries/categories/" + dictionary.get("id"),
+      Map.of("active", false),
+      200
+    );
+    assertEquals("New category", changed.get("nameEn"));
+    assertEquals(false, changed.get("active"));
+    admin.request(
+      "PATCH",
+      "/admin/dictionaries/buildings/" + dictionary.get("id"),
+      Map.of("active", true),
+      404
+    );
+  }
+
+  @Test
+  void round2ChatReadLeavesNewerMessagesUnreadAndHistoryValidatesCursor() throws Exception {
+    var seller = user();
+    var buyer = user();
+    String cid = (String) buyer
+      .request("POST", "/conversations", Map.of("listingId", listing(seller).get("id")), 201)
+      .get("id");
+    String first = null,
+      last = null;
+    for (int n = 0; n < 3; n++) {
+      last = (String) buyer
+        .request(
+          "POST",
+          "/conversations/" + cid + "/messages",
+          Map.of("clientMessageId", Db.id(), "kind", "TEXT", "text", "hello " + n),
+          201
+        )
+        .get("id");
+      if (first == null) first = last;
+    }
+    assertEquals(
+      2,
+      (
+        (Number) seller
+          .request(
+            "POST",
+            "/conversations/" + cid + "/read",
+            Map.of("lastReadMessageId", first),
+            200
+          )
+          .get("unreadCount")
+      ).intValue()
+    );
+    var page = seller.request("GET", "/conversations/" + cid + "/messages?limit=2", null, 200);
+    assertEquals(
+      List.of(2, 3),
+      items(page)
+        .stream()
+        .map(m -> ((Number) m.get("sequence")).intValue())
+        .toList()
+    );
+    var earlier = seller.request(
+      "GET",
+      "/conversations/" + cid + "/messages?limit=2&beforeCursor=" + page.get("nextCursor"),
+      null,
+      200
+    );
+    assertEquals(1, items(earlier).size());
+    assertNull(earlier.get("nextCursor"));
+    var later = seller.request(
+      "GET",
+      "/conversations/" + cid + "/messages?limit=1&afterCursor=1",
+      null,
+      200
+    );
+    assertEquals(2, ((Number) items(later).getFirst().get("sequence")).intValue());
+    seller.request("GET", "/conversations/" + cid + "/messages?beforeCursor=-1", null, 422);
+    seller.request("GET", "/conversations/" + cid + "/messages?afterCursor=abc", null, 422);
+    seller.request(
+      "POST",
+      "/conversations/" + cid + "/read",
+      Map.of("lastReadMessageId", last),
+      200
+    );
+    assertEquals(
+      0,
+      (
+        (Number) seller
+          .request(
+            "POST",
+            "/conversations/" + cid + "/read",
+            Map.of("lastReadMessageId", first),
+            200
+          )
+          .get("unreadCount")
+      ).intValue()
+    );
+  }
+
+  @Test
+  void round2PublishingProvidesFieldErrorsForInvalidTypesAndRanges() throws Exception {
+    var seller = user();
+    var body = new HashMap<String, Object>(
+      Map.of(
+        "title",
+        "Book",
+        "description",
+        "Book",
+        "priceMinor",
+        -1,
+        "categoryId",
+        "11111111-1111-4111-8111-111111111111",
+        "buildingId",
+        "22222222-2222-4222-8222-222222222221",
+        "conditionCode",
+        "GOOD",
+        "imageIds",
+        List.of(123)
+      )
+    );
+    assertEquals(
+      "OUT_OF_RANGE",
+      fields(seller.request("POST", "/listings", body, 422)).get("priceMinor")
+    );
+    body.put("priceMinor", 100);
+    assertEquals(
+      "INVALID_FORMAT",
+      fields(seller.request("POST", "/listings", body, 422)).get("imageIds")
+    );
+    body.put("title", "x".repeat(81));
+    assertEquals("TOO_LONG", fields(seller.request("POST", "/listings", body, 422)).get("title"));
+    body.put("title", "Book");
+    body.put("categoryId", "bad-id");
+    assertEquals(
+      "INVALID_FORMAT",
+      fields(seller.request("POST", "/listings", body, 422)).get("categoryId")
+    );
+  }
+
+  @Test
+  void round2DefaultLimitDoesNotSilentlyTruncateAfterFirstPage() throws Exception {
+    var me = user();
+    for (int n = 0; n < 25; n++) db.exec(
+      "insert into notifications(id,user_id,type,resource_type,resource_id) values(?,?,'TRADE_CHANGED','trade',?)",
+      Db.id(),
+      me.id,
+      Db.id()
+    );
+    var first = me.request("GET", "/notifications", null, 200);
+    assertEquals(20, items(first).size());
+    assertNotNull(first.get("nextCursor"));
+    var last = me.request("GET", "/notifications?cursor=" + first.get("nextCursor"), null, 200);
+    assertEquals(5, items(last).size());
+    assertNull(last.get("nextCursor"));
+    assertEquals(
+      25,
+      java.util.stream.Stream.concat(items(first).stream(), items(last).stream())
+        .map(row -> row.get("id"))
+        .distinct()
+        .count()
+    );
+    assertEquals(
+      "INVALID_FORMAT",
+      fields(me.request("GET", "/notifications?cursor=not-json", null, 422)).get("cursor")
+    );
+  }
+
+  @Test
+  void round2ZonesRetainExistingInactiveCriteriaButCannotChooseNewInactiveCriteria()
+    throws Exception {
+    var admin = user();
+    db.exec("update users set role='ADMIN' where id=?", admin.id);
+    var category = admin.request(
+      "POST",
+      "/admin/dictionaries/categories",
+      Map.of("nameZh", "旧分类", "nameEn", "Original category"),
+      201
+    );
+    var another = admin.request(
+      "POST",
+      "/admin/dictionaries/categories",
+      Map.of("nameZh", "另一分类", "nameEn", "Other category", "active", false),
+      201
+    );
+    var zone = admin.request(
+      "POST",
+      "/admin/zones",
+      Map.of(
+        "titleZh",
+        "专区",
+        "titleEn",
+        "Collection",
+        "startsAt",
+        "2026-01-01T00:00:00Z",
+        "endsAt",
+        "2027-01-01T00:00:00Z",
+        "categoryId",
+        category.get("id")
+      ),
+      201
+    );
+    admin.request(
+      "PATCH",
+      "/admin/dictionaries/categories/" + category.get("id"),
+      Map.of("active", false),
+      200
+    );
+    var disabled = admin.request(
+      "PATCH",
+      "/admin/zones/" + zone.get("id"),
+      Map.of("enabled", false),
+      200
+    );
+    assertEquals(category.get("id"), disabled.get("categoryId"));
+    assertEquals(false, disabled.get("enabled"));
+    var described = admin.request(
+      "PATCH",
+      "/admin/zones/" + zone.get("id"),
+      Map.of("descriptionEn", "Updated description", "categoryId", category.get("id")),
+      200
+    );
+    assertEquals("Updated description", described.get("descriptionEn"));
+    assertEquals(
+      "INVALID_REFERENCE",
+      fields(
+        admin.request(
+          "PATCH",
+          "/admin/zones/" + zone.get("id"),
+          Map.of("categoryId", another.get("id")),
+          422
+        )
+      ).get("categoryId")
+    );
+    assertEquals(
+      "INVALID_REFERENCE",
+      fields(
+        admin.request(
+          "POST",
+          "/admin/zones",
+          Map.of(
+            "titleZh",
+            "新专区",
+            "titleEn",
+            "New collection",
+            "startsAt",
+            "2026-01-01T00:00:00Z",
+            "endsAt",
+            "2027-01-01T00:00:00Z",
+            "categoryId",
+            category.get("id")
+          ),
+          422
+        )
+      ).get("categoryId")
+    );
+  }
 }

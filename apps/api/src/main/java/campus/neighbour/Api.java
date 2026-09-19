@@ -52,7 +52,10 @@ public class Api {
   }
 
   Map<String, Object> page(Object list) {
-    return data(Collections.singletonMap("items", list));
+    var result = new LinkedHashMap<String, Object>();
+    result.put("items", list);
+    result.put("nextCursor", null);
+    return data(result);
   }
 
   @GetMapping("/auth/csrf")
@@ -189,8 +192,13 @@ public class Api {
   }
 
   @GetMapping("/conversations")
-  Object conversations() {
-    return page(chat.list());
+  Object conversations(@RequestParam Map<String, String> q) {
+    return data(chat.list(q));
+  }
+
+  @GetMapping("/conversations/{id}")
+  Object conversationDetail(@PathVariable String id) {
+    return data(chat.detail(id));
   }
 
   @GetMapping("/conversations/{id}/messages")
@@ -222,8 +230,8 @@ public class Api {
   }
 
   @GetMapping("/trades")
-  Object trades() {
-    return page(t.list());
+  Object trades(@RequestParam Map<String, String> q) {
+    return data(t.list(q));
   }
 
   @GetMapping("/trades/{id}")
@@ -268,11 +276,19 @@ public class Api {
   }
 
   @GetMapping("/users/{id}/reviews")
-  Object userReviews(@PathVariable String id) {
-    return page(
-      db.rows(
-        "select r.id,r.rating,r.comment,r.created_at,u.nickname from reviews r join users u on u.id=r.author_id where recipient_id=? order by r.created_at desc limit 100",
-        id
+  Object userReviews(@PathVariable String id, @RequestParam Map<String, String> q) {
+    a.profile(id);
+    return data(
+      Pages.of(
+        db,
+        q,
+        "reviews:" + id,
+        "select * from (select r.id,r.rating,r.comment,r.created_at,u.nickname from reviews r join users u on u.id=r.author_id where recipient_id=?) reviewed where 1=1",
+        List.of(id),
+        "created_at",
+        "createdAt",
+        "::timestamptz",
+        false
       )
     );
   }
@@ -284,8 +300,8 @@ public class Api {
   }
 
   @GetMapping("/swap-requests")
-  Object swaps() {
-    return page(t.swaps());
+  Object swaps(@RequestParam Map<String, String> q) {
+    return data(t.swaps(q));
   }
 
   @GetMapping("/swap-requests/{id}")
@@ -303,11 +319,21 @@ public class Api {
   }
 
   @GetMapping("/notifications")
-  Object notifications() {
-    return page(
-      db.rows(
-        "select * from notifications where user_id=? order by created_at desc limit 100",
-        a.actor()
+  Object notifications(@RequestParam Map<String, String> q) {
+    String actor = a.actor();
+    String unread = Pages.choice(q, "unreadOnly", "true", "false");
+    return data(
+      Pages.of(
+        db,
+        q,
+        "notifications:" + actor,
+        "select * from notifications where user_id=?" +
+          ("true".equals(unread) ? " and read_at is null" : ""),
+        List.of(actor),
+        "created_at",
+        "createdAt",
+        "::timestamptz",
+        false
       )
     );
   }
@@ -350,10 +376,23 @@ public class Api {
   }
 
   @GetMapping("/admin/users")
-  Object users() {
+  Object users(@RequestParam Map<String, String> q) {
     a.admin();
-    return page(
-      db.rows("select id,nickname,status,role from users order by created_at desc limit 100")
+    String status = Pages.choice(q, "status", "ACTIVE", "RESTRICTED");
+    String sql = "select id,nickname,status,role,created_at from users where 1=1";
+    var p = new ArrayList<Object>();
+    if (status != null) {
+      sql += " and status=?";
+      p.add(status);
+    }
+    String search = q.get("q");
+    if (search != null && !search.isBlank()) {
+      Problem.field(search.length() <= 100, "q", "TOO_LONG");
+      sql += " and nickname ilike ?";
+      p.add("%" + search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%");
+    }
+    return data(
+      Pages.of(db, q, "admin-users", sql, p, "created_at", "createdAt", "::timestamptz", false)
     );
   }
 
@@ -368,9 +407,22 @@ public class Api {
   }
 
   @GetMapping("/admin/dictionaries/{kind}")
-  Object adminDictionaries(@PathVariable String kind) {
+  Object adminDictionaries(@PathVariable String kind, @RequestParam Map<String, String> q) {
     a.admin();
-    return page(db.rows("select * from dictionaries where kind=? order by name_zh", kind));
+    Problem.require(Set.of("categories", "courses", "buildings").contains(kind), 404, "NOT_FOUND");
+    return data(
+      Pages.of(
+        db,
+        q,
+        "admin-dictionaries:" + kind,
+        "select * from dictionaries where kind=?",
+        List.of(kind),
+        "name_zh",
+        "nameZh",
+        "",
+        true
+      )
+    );
   }
 
   @PostMapping("/admin/dictionaries/{kind}")
@@ -389,9 +441,21 @@ public class Api {
   }
 
   @GetMapping("/admin/zones")
-  Object adminZones() {
+  Object adminZones(@RequestParam Map<String, String> q) {
     a.admin();
-    return page(db.rows("select * from seasonal_zones order by starts_at desc"));
+    return data(
+      Pages.of(
+        db,
+        q,
+        "admin-zones",
+        "select * from seasonal_zones where 1=1",
+        List.of(),
+        "starts_at",
+        "startsAt",
+        "::timestamptz",
+        false
+      )
+    );
   }
 
   @PostMapping("/admin/zones")
@@ -406,8 +470,21 @@ public class Api {
   }
 
   @GetMapping("/admin/audit-logs")
-  Object audit() {
+  Object audit(@RequestParam Map<String, String> q) {
     a.admin();
-    return page(db.rows("select * from moderation_logs order by created_at desc limit 100"));
+    String type = Pages.choice(q, "targetType", "user", "listing");
+    String sql = "select * from moderation_logs where 1=1";
+    var p = new ArrayList<Object>();
+    if (type != null) {
+      sql += " and target_type=?";
+      p.add(type);
+    }
+    if (q.containsKey("targetId") && !q.get("targetId").isBlank()) {
+      sql += " and target_id=?";
+      p.add(q.get("targetId"));
+    }
+    return data(
+      Pages.of(db, q, "admin-audit", sql, p, "created_at", "createdAt", "::timestamptz", false)
+    );
   }
 }
