@@ -1,5 +1,34 @@
 # Campus Neighbour 部署运行与用户说明
 
+## 2026-09-19 实际运行入口
+
+项目已有首版实现。下方原“尚未建立”的表格属于设计初稿，实际命令以本节和[README](../README.md)为准。
+
+- 环境：Java21、Node24目标版本、pnpm10.33.0、Docker。
+- 依赖服务：仓库根目录`docker compose -f infra/compose.yml up -d --wait`。
+- 前端：根目录`pnpm install --frozen-lockfile`，然后`pnpm dev`，打开`http://127.0.0.1:5173`。
+- 后端：`cd apps/api`后运行`./mvnw spring-boot:run`；健康检查`http://localhost:8080/actuator/health`。
+- 测试：根目录`pnpm test`与`pnpm build`；后端目录`./mvnw verify`，自动创建独立测试容器。
+- 打包：后端`./mvnw package`生成`target/api-0.1.0.jar`，在后端目录运行`java -jar target/api-0.1.0.jar`。
+- 关闭服务：终端Ctrl+C；数据库／Redis用`docker compose -f infra/compose.yml stop`。不要使用删除数据卷选项，除非确认清空演示数据。
+
+### 容器化整站（配置已提供，镜像构建尚未本地验证）
+
+在根目录复制`.env.example`为`.env`，根据需要设置演示开关及密码，然后运行：
+
+```sh
+docker compose --env-file .env -f infra/compose.yml --profile app up --build -d
+```
+
+访问`http://localhost:8088`。后端与图片使用持久化卷，Nginx提供统一HTTP入口；HTTPS需要正式域名和证书后再配置，不能把本地HTTP演示当作已完成公网部署。若修改外部地址，同步PUBLIC_ORIGIN与Cookie安全配置。
+
+本地默认端口：前端5173、后端8080、PostgreSQL54329、Redis63799；若被占用，修改环境和代理设置。图片默认在启动后端工作目录`.data/uploads`，换目录启动前需设置绝对UPLOAD_ROOT以继续使用原图片。
+
+示例账号见README。默认关闭演示初始化；只在空库首次开启时创建虚构数据。实际验证、已知限制和测试通过范围见[实施记录](implementation/README.md)。
+
+---
+
+
 版本：v0.1 完整初稿｜日期：2026年9月18日｜负责人、审核人：待填写。
 
 状态：供团队评审，尚未实现或验证。具体业务默认值为建议基线；TDD开发方式已由项目发起人明确采用。

@@ -1,5 +1,7 @@
 # Campus Neighbour 接口契约
 
+> **2026-09-19 实施更新：** 已有真实接口和Swagger入口`http://localhost:8080/docs`，OpenAPI导出见[openapi.json](openapi.json)。首版完整表单编辑、部分列表上限和schema精度限制见[实施记录](../implementation/README.md)。下文为设计契约，不能把所有计划参数当作均已实现。
+
 版本：v0.1 完整初稿｜日期：2026年9月18日｜负责人、审核人：待填写。
 
 状态：供团队评审，尚未实现或验证。具体业务默认值为建议基线；TDD开发方式已由项目发起人明确采用。

@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:18.3
+    environment:
+      POSTGRES_DB: campus
+      POSTGRES_USER: campus
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-campus-local}
+    ports: ["127.0.0.1:54329:5432"]
+    volumes: ["postgres:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campus"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:8.6.1-alpine
+    ports: ["127.0.0.1:63799:6379"]
+    volumes: ["redis:/data"]
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  api:
+    profiles: [app]
+    build: ../apps/api
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/campus
+      DB_USER: campus
+      DB_PASSWORD: ${DB_PASSWORD:-campus-local}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8088}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      DEMO_DATA_ENABLED: ${DEMO_DATA_ENABLED:-false}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+    volumes: ["uploads:/app/uploads"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+  web:
+    profiles: [app]
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    ports: ["127.0.0.1:8088:80"]
+    depends_on: [api]
+
+volumes:
+  postgres:
+  redis:
+
+  uploads:

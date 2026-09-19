@@ -24,3 +24,10 @@
 - 按用户决定采用TDD，写入Red→Green→Refactor、缺陷先复现、真实数据库并发测试及PR证据要求。
 - 所有负责人和审核人待填写；建议规则待评审，测试与运行结果均未执行。
 - 本次仅维护Markdown文档，没有搭框架或修改既有申报书、需求Word/PDF导出。
+
+## 2026年9月19日 首版实现
+
+- 增加React/TypeScript前端、Java后端、Flyway迁移、PostgreSQL/Redis运行配置、实时消息和交易流程。
+- 按TDD建立聊天与核心业务测试，增加并发、权限、上传、WebSocket等集成检查。
+- 添加Maven Wrapper、前端锁文件、Dockerfile、Nginx和GitHub Actions，README改为运行入口。
+- 记录实际测试结果和初稿差异，供团队审查；未宣称生产部署、完整验收或全部平台兼容验证完成。
