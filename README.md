@@ -57,9 +57,12 @@
 ## 辅助材料与下载
 
 - [项目申报书（在线阅读）](docs/proposal.md)
+- [申报书与四份课件的对应说明](docs/proposal-course-alignment.md)：需求工程、增量开发、TDD、项目管理如何体现在方案中。
 - [技术选型评审背景](docs/technology-review.md)
 - [修改记录](docs/changes.md)
 - [申报书Word](docs/downloads/Campus_Neighbour_Proposal.docx) · [申报书PDF](docs/downloads/Campus_Neighbour_Proposal.pdf)
 - [需求说明书Word（v0.2）](docs/downloads/Campus_Neighbour_SRS.docx)
 
 申报书、团队阅读版、路线和修改记录属于辅助材料，不另计入8份工程文档。新补设计以仓库Markdown为维护版本；现有Word/PDF导出对应申报书和需求说明书，不包含所有新增工程文档。
+
+申报书 Markdown、Word 和 PDF 已于2026年9月23日同步补充课程内容；访谈、学生试用和每周评审均按计划描述，实际执行证据应另行记录。
