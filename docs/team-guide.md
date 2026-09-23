@@ -58,7 +58,7 @@
 
 ## 不同成员怎样使用这些文档
 
-具体九人岗位、每人先做什么以及成果交给谁，见[九人分工与项目协作手册](team-workflow.md)。先认领一项小任务，再根据实际成果调整长期分工。
+具体九人岗位、每人先做什么以及成果交给谁，见[九人分工与项目协作手册](team-workflow.md)。岗位名单已确定：R1 YUHAN JIAO、R2 RUIYU GONG、R3 YIAYI WU、R4 JIAYI ZHENG、R5 HAN HUANG、R6 ZIYE JIANG、R7 RUIJIE LI、R8 JUNYU PAN、R9 LU LIU。按各自岗位先领取一项小任务，后续调整共同记录。
 
 | 工作 | 阅读重点 | 可以交付的成果 |
 | --- | --- | --- |

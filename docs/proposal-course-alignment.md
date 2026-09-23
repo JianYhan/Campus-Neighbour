@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | Lecture 1 — Introduction & Course Overview；Software Product、Course learning outcomes | 软件工程还包括需求、设计、安全、测试、文档和维护 | §3.3 写明权限、可靠性、可用性与可维护性，并保留安装说明、用户指南和缺陷记录；O1、O4 覆盖需求设计与验证交付。 |
 | Lecture 2 — Software Processes & Agile Software Development；Incremental Development、Extreme Programming、Software validation | 增量开发、反馈、测试先行、持续集成和重构 | §3.2 说明每轮交织需求、设计、实现和验证；§4 写明 TDD 的失败测试→实现→重构，并用同一商品不能被两名买家同时预留举例。 |
-| Lecture 3 — Project Management；Project management activities、Group communications | 任务计划、估算、协作、进度证据、风险与汇报 | §7 用任务、依赖和完成证据追踪进度；安排每周评审，记录阻碍和决定，关注集成延误与范围变化。负责人、内部日期和进度仍待填写。 |
+| Lecture 3 — Project Management；Project management activities、Group communications | 任务计划、估算、协作、进度证据、风险与汇报 | §7 用任务、依赖和完成证据追踪进度；安排每周评审，记录阻碍和决定，关注集成延误与范围变化。九人岗位及行动计划责任已填写；内部日期和实际进度仍待填写。 |
 | Lecture 5 — Requirements Engineering；User and system requirements、Elicitation、Validation、Change management | 区分用户需求与系统需求、功能与质量约束，获取和验证需求，管理变更 | O1 计划访谈买卖双方、走查交易习惯、评审管理需求；检查需求的有效性、一致性、完整性、可行性和可测试性；§7 说明变更前评估影响，再同步需求与计划。 |
 
 ## 怎样理解这些修改
@@ -34,4 +34,4 @@
 
 格式参照用户提供的 Proposal_Template.pdf；本说明属于辅助材料，不新增到八份工程文档中。
 
-另核对《JC2001 Group Project Description and Requirements 2026–27》的 Project Proposal 与 Formatting Requirements：要求标题页列出小组编号、专业及成员姓名和学号；正文为 4–8 页，标题页不计入；采用 A4、四边 1 英寸页边距、12 号 Arial 或 Times New Roman、单栏、1.5 倍行距。当前导出为标题页 1 页加正文及参考文献 7 页。
+另核对《JC2001 Group Project Description and Requirements 2026–27》的 Project Proposal 与 Formatting Requirements：要求标题页列出小组编号、专业及成员姓名和学号；正文为 4–8 页，标题页不计入；采用 A4、四边 1 英寸页边距、12 号 Arial 或 Times New Roman、单栏、1.5 倍行距。填写九人分工后的导出为标题页 1 页加正文及参考文献 8 页。

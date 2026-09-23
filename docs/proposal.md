@@ -13,7 +13,7 @@ Academic Year 2026–27
 | Academic supervisor | [To be filled] |
 | Proposal submission deadline | 25 September 2026, 23:59 CST |
 | Project start and end dates | [To be filled] |
-| Group members and student IDs | 1. YUHAN JIAO 50106173<br>2. ZIYE JIANG 50106131<br>3. LU LIU 50106174<br>4. RUIYU GONG 50106169<br>5. Han Huang 50106171<br>6. YIAYI WU 50106143<br>7. JIAYI ZHENG 50106140<br>8. RUIJIE LI 50106150<br>9. JUNYU PAN 50106130 |
+| Group members and student IDs | 1. YUHAN JIAO 50106173<br>2. ZIYE JIANG 50106131<br>3. LU LIU 50106174<br>4. RUIYU GONG 50106169<br>5. HAN HUANG 50106171<br>6. YIAYI WU 50106143<br>7. JIAYI ZHENG 50106140<br>8. RUIJIE LI 50106150<br>9. JUNYU PAN 50106130 |
 
 Proposed project focus
 
@@ -118,7 +118,9 @@ The proposal is mandatory although unmarked; missing or late submission may resu
 
 ## 7 Action plan
 
-Internal task assignments, deadlines and progress values are to be filled by the group in line with the course dates above.
+Responsibilities are assigned below. Internal deadlines and progress remain to be filled in line with the course dates above; assignment does not imply completion.
+
+YUHAN JIAO leads architecture, core development and integration; RUIYU GONG develops supporting features; YIAYI WU manages requirements; JIAYI ZHENG leads interaction design; HAN HUANG leads functional testing; ZIYE JIANG leads test automation and quality; RUIJIE LI manages deployment and software delivery; JUNYU PAN coordinates technical documentation; LU LIU coordinates the project and presentation. Members provide evidence for their own work and review one another's outputs.
 
 The group will track prioritised tasks, estimates, dependencies and completion evidence in GitHub Issues [4]. Weekly reviews will compare working software and test results with the plan, discuss blockers and record decisions for course updates. Integration delays and scope changes will be monitored through early integration and a prioritised backlog. Proposed changes will be assessed for user value, effort and effects on design and tests before updating the requirements and plan [5].
 
@@ -126,30 +128,30 @@ The group will track prioritised tasks, estimates, dependencies and completion e
 
 | Action | Assigned to | Deadline | Progress |
 | --- | --- | --- | --- |
-| Interview users, review trading practices and prioritise requirements. | [To be filled] | [To be filled] | [To be filled] |
-| Review use cases, prototype, architecture, data model and acceptance criteria. | [To be filled] | [To be filled] | [To be filled] |
+| Interview users, review trading practices and prioritise requirements. | YIAYI WU | [To be filled] | [To be filled] |
+| Review use cases, prototype, architecture, data model and acceptance criteria. | JIAYI ZHENG<br>YUHAN JIAO | [To be filled] | [To be filled] |
 
 ### Objective O2 Core trading workflow
 
 | Action | Assigned to | Deadline | Progress |
 | --- | --- | --- | --- |
-| Build accounts, listings, filters and private chat. | [To be filled] | [To be filled] | [To be filled] |
-| Build reservation, handover confirmation and reviews. | [To be filled] | [To be filled] | [To be filled] |
+| Build accounts, listings, filters and private chat. | YUHAN JIAO<br>RUIYU GONG | [To be filled] | [To be filled] |
+| Build reservation, handover confirmation and reviews. | YUHAN JIAO | [To be filled] | [To be filled] |
 
 ### Objective O3 Campus enhancements
 
 | Action | Assigned to | Deadline | Progress |
 | --- | --- | --- | --- |
-| Add user profiles, campus-specific fields, seasonal collections and direct barter. | [To be filled] | [To be filled] | [To be filled] |
-| Implement and test preset question buttons and short free-text messages in buyer-seller chat. | [To be filled] | [To be filled] | [To be filled] |
+| Add user profiles, campus-specific fields, seasonal collections and direct barter. | RUIYU GONG<br>YUHAN JIAO | [To be filled] | [To be filled] |
+| Implement and test preset question buttons and short free-text messages in buyer-seller chat. | RUIYU GONG<br>ZIYE JIANG | [To be filled] | [To be filled] |
 
 ### Objective O4 Testing and delivery
 
 | Action | Assigned to | Deadline | Progress |
 | --- | --- | --- | --- |
-| Use TDD and automated checks for permissions, trading states, search and concurrency. | [To be filled] | [To be filled] | [To be filled] |
-| Run student tasks, resolve defects and repeat affected tests. | [To be filled] | [To be filled] | [To be filled] |
-| Prepare the release, report, manual and presentation. | [To be filled] | [To be filled] | [To be filled] |
+| Coordinate automated quality checks; developers apply TDD to their changes. | ZIYE JIANG | [To be filled] | [To be filled] |
+| Run student tasks and retest defects after developers fix them. | HAN HUANG | [To be filled] | [To be filled] |
+| Prepare the release (LI), report and manual (PAN), and coordination and presentation (LIU). | RUIJIE LI<br>JUNYU PAN<br>LU LIU | [To be filled] | [To be filled] |
 
 ## References
 
