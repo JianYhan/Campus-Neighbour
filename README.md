@@ -32,6 +32,42 @@
 
 “完整初稿”指已覆盖设计范围和评审内容。接口当前采用可阅读的字段与端点契约，机器可校验OpenAPI将在相关接口开工前补齐；实际测试和运行证据在实施后记录。
 
+## 技术栈与运行环境
+
+| 类别 | 组件 | 版本／说明 | 验证状态 |
+| --- | --- | --- | --- |
+| 前端 | React + TypeScript + Vite | 包管理 pnpm（版本见 `.nvmrc` / `pnpm-lock.yaml`） | 已在 macOS 本机运行 |
+| 后端 | Java + Spring Boot | 使用仓库自带 Maven Wrapper（`mvnw`），Java 21 | 已在 macOS 本机运行 |
+| 数据库 | PostgreSQL | 以 `infra` 中 Compose 配置为准 | 已在 macOS 本机运行 |
+| 缓存／会话 | Redis | 以 Compose 配置为准 | 已在 macOS 本机运行 |
+| 容器 | Docker / Docker Compose | 启动 PostgreSQL 与 Redis 等依赖服务 | 已在 macOS 本机运行 |
+| CI | GitHub Actions（`.github/workflows/checks.yml`） | 前端检查、后端 Maven 验证、Playwright 浏览器检查 | 已配置；运行失败原因待排查 |
+
+> 验证状态说明：“已在 macOS 本机运行”指 R7 已在 macOS 个人电脑上配置环境并完成本地启动，验证了页面访问、登录和商品查看（基于 `feat/campus-neighbour-app` 分支）；其他操作系统复现、完整交易流程及线上部署尚未验证。各组件最终版本以 R1 选型确认和实际配置文件为准。
+
+## 快速启动（基于 macOS 验证）
+
+```bash
+# 1. 切换到开发分支
+git checkout feat/campus-neighbour-app
+
+# 2. 复制环境变量模板并按需填写（勿提交真实密码或密钥）
+cp .env.example .env
+
+# 3. 启动 PostgreSQL、Redis 等依赖服务
+docker compose up -d
+
+# 4. 安装前端依赖并启动前端
+pnpm install
+pnpm dev
+
+# 5. 启动后端（Spring Boot）
+./mvnw spring-boot:run
+```
+
+> 以上为概要流程；具体命令、端口与配置以 [docs/operations.md](docs/operations.md) 和开发分支实际配置为准。
+> 当前已验证内容（macOS，`feat/campus-neighbour-app` 分支）：网页可打开、可登录、可查看商品信息。聊天、预约、确认收货等完整流程及跨设备复现尚未验证。
+
 ## 开发方式：TDD
 
 项目已确定采用**测试驱动开发（TDD）**：
@@ -54,6 +90,14 @@
 4. 领取小任务：已有功能进行独立验收和缺陷修复，未完成行为按TDD逐步实现。
 
 课程节点见[文档与开发路线](docs/document-roadmap.md)，任务接手与交接见[协作手册](docs/team-workflow.md)。路线中的阶段状态保留早期规划；实际运行命令应结合开发分支核验后同步到运行说明。
+
+## 部署与交付状态（R7）
+
+- **已完成：** GitHub 仓库基础结构与 README 维护；依赖清单草稿（见上表）；macOS 本地环境配置与启动验证（页面访问、登录、商品查看）。
+- **待验证：** 聊天、预约、确认收货等完整交易流程；其他组员按本说明独立启动复现；CI 工作流失败原因排查（与 R6 协作）。
+- **待确认：** 线上部署平台、域名与生产环境配置（Nginx／HTTPS 为计划内容，尚未实施）。
+
+后续复现与验证结果将更新到[部署运行与用户说明](docs/operations.md)，并区分“已验证”与“待验证”步骤。
 
 ## 辅助材料与下载
 
