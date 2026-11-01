@@ -94,3 +94,49 @@ files from versions that have been verified by actually running the project.
 - Exact resolved frontend versions should be checked against `pnpm-lock.yaml`.
 - Maven-resolved versions should be confirmed by a successful backend build.
 - No real passwords, tokens or private environment values are recorded in this document.
+## R7 Update2 环境记录
+
+### 已确认的项目配置
+
+The following values were extracted from the `feat/campus-neighbour-app`
+branch configuration:
+
+- pnpm requirement: `10.33.0`
+- Backend Java requirement: `21`
+- PostgreSQL image: `postgres:18.3`
+- Redis image: `redis:8.6.1-alpine`
+- PostgreSQL host port: `54329`
+- Redis host port: `6379`
+- API service port: `8088`
+- Frontend package: `apps/web`
+- Backend package: `apps/api`
+- Docker Compose file: `infra/compose.yml`
+
+### Local machine status
+
+- Operating system: macOS `26.3.1`
+- Java: `26.0.2.1`
+- Node.js: `24.13.0`
+- pnpm: `10.33.0`
+- Docker: `29.8.0`
+- Docker Compose: `v5.5.1`
+
+### Verification status
+
+- pnpm installation and version matching: verified.
+- Repository dependency configuration: extracted from the development branch.
+- Java compatibility: not verified; the project declares Java 21 while the local machine reports Java 26.
+- Complete backend startup: not verified.
+- Complete frontend startup: not verified.
+- Complete CI execution: not verified.
+- Cross-device reproduction: not verified.
+
+### Current blocker
+
+The local Java version does not match the Java version declared by
+`apps/api/pom.xml`. Before claiming that the backend environment is
+reproducible, install or activate Java 21 and rerun the backend build and
+startup checks.
+
+No real passwords, tokens, or private environment values should be recorded
+in this document.
