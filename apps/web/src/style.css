@@ -121,6 +121,9 @@ small {
   max-width: 1600px;
   margin: auto;
 }
+.app nav {
+  font-size: 18px;
+}
 .site-header {
   height: 100px;
   display: flex;
@@ -175,6 +178,20 @@ small {
   display: flex;
   align-items: center;
   gap: 13px;
+}
+.header-actions button {
+  font-size: 18px;
+  padding: 10px 13px;
+  background: transparent;
+}
+.header-actions a {
+  font-size: 18px;
+  padding: 10px 20px;
+}
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .icon-btn {
   display: inline-flex;
@@ -256,7 +273,6 @@ small {
   padding: 52px 50px;
 }
 .eyebrow {
-  font-size: 10px;
   letter-spacing: 2px;
   font-weight: 600;
   display: flex;
@@ -440,11 +456,24 @@ small {
 .value-strip span {
   display: flex;
   gap: 10px;
+  font-size: 15px;
   align-items: center;
 }
 .market {
   padding: 45px 5% 25px;
   scroll-margin-top: 25px;
+}
+.market h2 {
+  margin: 0 0 12px;
+  font-size: 35px;
+}
+.market span {
+  font-size: 20px;
+  color: rgb(32, 69, 11);  
+  background: rgb(215, 225, 210);
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-weight: bold;
 }
 .section-heading {
   display: flex;
@@ -482,11 +511,11 @@ small {
   border: none;
   background: transparent;
   outline: none;
-  font-size: 13px;
+  font-size: 18px;
 }
 .search-line > select {
   width: 160px;
-  font-size: 12px;
+  font-size: 18px;
 }
 .filter-line {
   display: flex;
@@ -501,6 +530,10 @@ small {
   flex-wrap: wrap;
   gap: 7px;
 }
+.categories > .chip {
+  font-size: 18px;
+  padding: 8px 14px;
+}
 .secondary-filters {
   display: flex;
   gap: 7px;
@@ -509,11 +542,11 @@ small {
 .secondary-filters select {
   width: 127px;
   padding: 8px;
-  font-size: 11px;
+  font-size: 18px;
 }
 .secondary-filters .price-input {
-  width: 72px;
-  font-size: 11px;
+  width: 100px;
+  font-size: 18px;
   padding: 8px;
 }
 .product-grid {
@@ -527,6 +560,13 @@ small {
   border: 1px solid var(--line);
   border-radius: 11px;
   overflow: hidden;
+}
+.product-card span {
+  display: block;
+  font-size: 18px;
+  margin: 8px 0 0;
+  background: rgba(255, 255, 255, 0.834);
+  border-radius: 8px;
 }
 .product-card:hover {
   box-shadow: 0 8px 20px #142c1709;
@@ -576,16 +616,17 @@ small {
   padding: 17px 15px 13px;
 }
 .card-body h3 {
-  font-size: 13px;
+  font-size: 20px;
   line-height: 1.5;
   margin: 0;
 }
 .card-body strong {
-  font-size: 16px;
+  font-size: 23px;
   white-space: nowrap;
+  color:rgb(146, 47, 47)
 }
 .card-body p {
-  font-size: 10px;
+  font-size: 16px;
   color: var(--muted);
   margin: 8px 0 13px;
 }
@@ -596,6 +637,13 @@ small {
   justify-content: space-between;
   font-size: 9px;
   color: var(--muted);
+}
+.card-foot span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  background: rgb(255, 255, 255)
 }
 .online-dot {
   display: inline-block;

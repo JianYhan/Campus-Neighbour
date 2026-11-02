@@ -136,7 +136,16 @@ export function App() {
               >
                 <Bell size={18} />
               </Link>
-              <Link to="/profile" className="avatar" aria-label={w('我的资料', 'My profile')}>
+              <Link to="/profile" style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '36px',
+                height: '36px',
+                minWidth: '36px',
+                marginRight: '20px',
+                borderRadius: '50%',
+              }} className="avatar" aria-label={w('我的资料', 'My profile')}>
                 {me.data.nickname?.slice(0, 1)}
               </Link>
             </>
