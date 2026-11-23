@@ -71,3 +71,13 @@ test('English dark mobile layout remains within the viewport', async ({ page }) 
   await page.getByRole('button', { name: 'Switch theme', exact: true }).click();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test('registered student profile survives a reload', async ({ page }) => {
+  await register(page);
+  await page.getByRole('link', { name: '我的资料', exact: true }).click();
+  await expect(page).toHaveURL(/\/profile$/);
+  await expect(page.getByLabel('昵称', { exact: true })).toHaveValue('测试邻居');
+  await page.reload();
+  await expect(page.getByRole('link', { name: '我的资料', exact: true })).toBeVisible();
+  await expect(page.getByLabel('昵称', { exact: true })).toHaveValue('测试邻居');
+});
